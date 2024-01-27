@@ -1,0 +1,8 @@
+[
+	{
+		"directory": "d:/projects/c/rustscript/",
+		"file": "main.c",
+		"output": "main.o",
+		"arguments": ["clang", "-xc", "main.c", "-I", "./deps/include", "-I", "./lib", "-c"]
+	}
+]
