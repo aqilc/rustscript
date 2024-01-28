@@ -1,6 +1,6 @@
 # rustscript
 
-A very ambitious project, with the goal of making a combination systems language that tries to combine the main concepts from the languages Typescript and Rust. Aims to be the first systems language to have JSON as a first class citizen.
+A very ambitious project, with the goal of making a combination systems language that tries to combine the main concepts from the languages Typescript and Rust. Aims to be the first systems language to have JSON as a first class citizen. Data types will be simple like C and other than slight ownership, will leave management to the user. Should be usable without types with powerful inference to an extent.
 
 ### Preliminary Syntax
 
@@ -11,13 +11,18 @@ struct Datatype {
 	number: u32 = 0; // Optionals and defaults in-built.
 	string: str; // Only stores length and capacity with extremely transparent and simple logic and easy conversion to C string.
 	array: u32[]; // All arrays are variable size, contain the same things as strings.
-	object: { [key: str]: str }; // or record<str>
+	object: { [key: str]: str }; // or record<str, str>
 	object2: {
 		hi: str,
-		[2]: bool // All keys are automatically converted to strings.
+		[2]: bool // Unlike in Typescript, number keys are possible
 	}; // { ... } type declarations are treated as records, not Structs. If you want to make a struct you have to define it with `struct x {}`.
-	optional?: *u32; // Option types can only be pointers.
+	optional?: *Database; // Option types can only be pointers. Type recursion can only be done with pointers.
 }
+
+const obj = {
+	prop: "lol"
+}; // Defines a map or struct depending on if the indexing operator([]) is ever used on it.
+// obj.prop and obj["prop"] will always do completely different things, and the second will always be slower.
 
 // Alternative function syntaxes (last one is technically what happens internally anyways)
 fn ez1() { 1 }
@@ -71,3 +76,9 @@ fn main() {
 - Simple Ownership rules
 	- `*` = Mutable pointer, `&` = Immutable Reference
 		- Cannot take multiple `*`s of an object at once.
+- Immutable strings
+	- `"hi" + 2`
+		- Checks if `2` has a `toString` trait and calls it if it does, then makes a new string with the combination of the two.
+		- If string size is known at compile time, it will not be put with the data.
+
+> Reusing a lot of code from `aqilc/jsc`
