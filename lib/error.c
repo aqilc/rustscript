@@ -47,7 +47,7 @@ void error_at(char* str, u32 place, char* fmt, ...) {
 	char* start,* end;
 	u32 linenum = line(str, &place, &start, &end);
 	u32 linenumlen = intlen(linenum);
-	u32 len = start - end - 1 + 3 + linenumlen;
+	// u32 len = start - end - 1 + 3 + linenumlen;
 
 	// The error
 	va_list args;

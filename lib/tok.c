@@ -4,24 +4,6 @@
 #include "error.h"
 #include "tok.h"
 
-struct { char* s; RS_TokenType t; } keyword_defs[] = {
-	"let",    TT_KLET,
-	"fn",     TT_KFN,
-	"struct", TT_KSTRUCT,
-	"if",     TT_KIF,
-	"else",   TT_KELSE,
-	"return", TT_KRETURN,
-	"trait",  TT_KTRAIT,
-
-	"u32",    TT_TU32,
-	"u16",    TT_TU16,
-	"u8",     TT_TU8,
-	"i32",    TT_TI32,
-	"i16",    TT_TI16,
-	"i8",     TT_TI8,
-	"bool",   TT_TBOOL
-};
-
 ht(char*, RS_TokenType) keywords;
 
 static inline u32 utf8(u8** str) {
@@ -29,7 +11,7 @@ static inline u32 utf8(u8** str) {
 	u32 code_point = 0;
 
 	int len =
-		**str > 0x80 ? // 10000000
+		**str > 0x80 ? // 0b10000000
 			(**str & 0xE0) == 0xE0 ? 2 : // 0b11100000
 				(**str & 0xC0) == 0xC0 ? 1 : 3 // 0b11000000
 		: 0;
@@ -47,14 +29,29 @@ RS_Token* tokenize(char* str) {
 	
 	// Sets up keyword search
 	if(!hgets(keywords, "if"))
-		for(u32 i = 0; i < sizeof(keyword_defs) / sizeof(keyword_defs[0]); i ++)
-			hsets(keywords, keyword_defs[i].s) = keyword_defs[i].t;
+		hinit(keywords, {
+			{ "let",    TT_KLET    },
+			{ "fn",     TT_KFN     },
+			{ "struct", TT_KSTRUCT },
+			{ "if",     TT_KIF     },
+			{ "else",   TT_KELSE   },
+			{ "return", TT_KRETURN },
+			{ "trait",  TT_KTRAIT  },
+			
+			{ "u32",    TT_TU32    },
+			{ "u16",    TT_TU16    },
+			{ "u8",     TT_TU8     },
+			{ "i32",    TT_TI32    },
+			{ "i16",    TT_TI16    },
+			{ "i8",     TT_TI8     },
+			{ "bool",   TT_TBOOL   },
+		});
 
 			
 	char* start = str;
 	RS_Token* ret = vnew();
 
-	#define op(t) vpush(ret, { .type = t, .len = 1, .data = NULL, .place = str - start })
+	#define op(t, l) vpush(ret, { .type = t, .len = l, .data = NULL, .place = str - start })//, printf("Op %s, %d\n", str, t)
 	#define error(...) { vpush(ret, { .type = TT_ERROR, .len = 0, .data = NULL, .place = str - start }); error_at(start, str - start, __VA_ARGS__); return ret; }
 
 	u32 point = 0;
@@ -63,7 +60,8 @@ RS_Token* tokenize(char* str) {
 		
 		// Floats not supported yet
 		if(num(point)) {
-			while (num((point = utf8((u8**) &str))));
+			char* lasttok = str;
+			while (num((point = utf8((u8**) &str)))) lasttok = str;
 
 			u32 len = str - tokstart + !point; // Weird behavior at the end of strings
 			char* num = malloc(len + 1);
@@ -72,10 +70,13 @@ RS_Token* tokenize(char* str) {
 			
 			vpush(ret, { .data = num, .type = TT_INT, .place = str - start, .len = len });\
 			if(str[0] == '.') error("Floats are not available yet!");
+			str = lasttok;
+			continue;
 		}
 
 		if(alpha(point)) {
-			while (alpha((point = utf8((u8**) &str))) || num(point));
+			char* lasttok = str;
+			while (alpha((point = utf8((u8**) &str))) || num(point)) lasttok = str;
 
 			u32 len = str - tokstart + !point; // Weird behavior at the end of strings
 			char* data;
@@ -89,97 +90,96 @@ RS_Token* tokenize(char* str) {
 			if(res) //printf("whoa got a keyword\n"),
 				vpush(ret, { .type = *res, .data = data, .len = len, .place = str - start });
 			else vpush(ret, { .type = TT_IDENT, .data = data, .len = len, .place = str - start });
+			str = lasttok;
+			continue;
 		}
 
 		if(point == '"') {
 			while ((point = utf8((u8**) &str)) && point != '"');
+			if(point != '"') error("Unterminated string!");
+
+			point = utf8((u8**) &str);
 
 			u32 len = str - tokstart + !point; // Weird behavior at the end of strings
-			printf("\n%s, %s: %d len", start, str, len);
 			char* data = malloc(len + 1);
 			data[len] = 0;
 			memcpy(data, str - len - !!point, len);
-			printf("\n%s, %s: %s, %d len", start, str, data, len);
-
-			if(point != '"') error("Unterminated string!");
+			// printf("\n%s, %s: %s, %d len", start, str, data, len);
+			
 			vpush(ret, { .type = TT_STRING, .data = data, .len = len, .place = str - start });
+			continue;
 		}
 
 		switch (point) {
-		case '(': op(TT_POPENPAR); break;
-		case ')': op(TT_PCLOSEPAR); break;
-		case '{': op(TT_POPENCBR); break;
-		case '}': op(TT_PCLOSECBR); break;
-		case '[': op(TT_POPENSQBR); break;
-		case ']': op(TT_PCLOSESQBR); break;
-		case '=':
-			if(str[0] == '=') op(TT_OPEQ);
-			else if (str[0] == '>') op(TT_PARROW);
-			else op(TT_OPSET);
-			break;
-		case '+': 
-			if(str[0] == '=') op(TT_OPADDSET);
-			else op(TT_OPADD);
-			break;
-		case '*':
-			if(str[0] == '=') op(TT_OPMULSET);
-			else op(TT_OPMUL);
-			break;
-		case '/':
-			if(str[0] == '=') op(TT_OPDIVSET);
-			else op(TT_OPDIV);
-			break;
-		case '%':
-			if(str[0] == '=') op(TT_OPMODSET);
-			else op(TT_OPMOD);
-			break;
-		case '|':
-			if(str[0] == '=') op(TT_OPBORSET);
-			else if(str[0] == '|') op(TT_LOR);
-			else op(TT_OPBOR);
-			break;
-		case '&':
-			if(str[0] == '=') op(TT_OPBANDSET);
-			else if(str[0] == '&') op(TT_LAND);
-			else op(TT_OPBAND);
-			break;
-		case '^':
-			if(str[0] == '=') op(TT_OPBXORSET);
-			else op(TT_OPBXOR);
-			break;
-		case '~':
-			if(str[0] == '=') op(TT_OPBNOTSET);
-			else op(TT_OPBNOT);
-			break;
-		case '!':
-			if(str[0] == '=') op(TT_OPNOTEQ);
-			else op(TT_LNOT);
-			break;
-		case '<':
-			if(str[0] == '=') op(TT_OPLESSEQ);
-			else if(str[0] == '<') {
-				if(str[1] == '=') op(TT_OPBSHIFTLEFTSET);
-				else op(TT_OPBSHIFTLEFT);
-			}
-			else op(TT_OPLESS);
-			break;
-		case '>':
-			if(str[0] == '=') op(TT_OPGREATEQ);
-			else if(str[0] == '>') {
-				if(str[1] == '=') op(TT_OPBSHIFTRIGHTSET);
-				else op(TT_OPBSHIFTRIGHT);
-			}
-			else op(TT_OPGREATER);
-			break;
-		case ':': op(TT_OPCOLON); break;
+		case '(': op(TT_POPENPAR, 1); continue;
+		case ')': op(TT_PCLOSEPAR, 1); continue;
+		case '{': op(TT_POPENCBR, 1); continue;
+		case '}': op(TT_PCLOSECBR, 1); continue;
+		case '[': op(TT_POPENSQBR, 1); continue;
+		case ']': op(TT_PCLOSESQBR, 1); continue;
+		case ';': op(TT_PSEMICOLON, 1); continue;
+		case ',': op(TT_PCOMMA, 1); continue;
+		case ':': op(TT_OPCOLON, 1); continue;
+		case '.': op(TT_OPDOT, 1); continue;
 		}
+
+		char* tokstart2 = str;
+		u32 peek = utf8((u8**) &str);
+		RS_TokenType t = 0;
+		switch(point) {
+		case '+': if (peek == '+') { op(TT_OPINCR, 2); continue; } else t = TT_OPADD; break;
+		case '-': if (peek == '-') { op(TT_OPDECR, 2); continue; } else t = TT_OPSUB; break;
+		case '*': if (peek == '*') { op(TT_OPPOW, 2); continue; } else t = TT_OPMUL; break;
+		case '/': t = TT_OPDIV; break;
+		case '%': t = TT_OPMOD; break;
+		case '|': if (peek == '|') { op(TT_LOR, 2); continue; } else t = TT_OPBOR; break;
+		case '&': if (peek == '&') { op(TT_LAND, 2); continue; } else t = TT_OPBAND; break;
+		case '^': t = TT_OPBXOR; break;
+		case '~': t = TT_OPBNOT; break;
+		}
+
+		if(t && peek == '=') { op(t + TT_OPADDSET - TT_OPADD, 2); continue; }
+		else if(t) { op(t, 1); str = tokstart2; continue; }
+		
+		if(point == '!') {
+			if (peek == '=') op(TT_CNOTEQ, 2);
+			else { op(TT_LNOT, 1); str = tokstart2; }
+			continue;
+		} else if (point == '=') {
+			if (peek == '>') op(TT_PARROW, 2);
+			else if (peek == '=') op(TT_CEQ, 2);
+			else { op(TT_OPSET, 1); str = tokstart2; }
+			continue;
+		}
+
+		char* tokstart3 = str;
+		u32 peek2 = utf8((u8**) &str);
+		switch(point) {
+		case '<':
+			if (peek == '=') op(TT_CLESSEQ, 2);
+			else if (peek == '<') {
+				if (peek2 == '=') op(TT_OPBSHIFTLEFTSET, 3);
+				else { op(TT_OPBSHIFTLEFT, 2); str = tokstart3; }
+			}
+			else { op(TT_CLESS, 1); str = tokstart2; }
+			continue;
+		case '>':
+			if (peek == '=') op(TT_CGREATEQ, 2);
+			else if (peek == '>') {
+				if (peek2 == '=') op(TT_OPBSHIFTRIGHTSET, 3);
+				else { op(TT_OPBSHIFTRIGHT, 2); str = tokstart3; }
+			}
+			else { op(TT_CGREATER, 1); str = tokstart2; }
+			continue;
+		}
+
+		str = tokstart;
 	}
+
+	op(TT_EOF, 0);
 
 	#undef op
 	#undef error
-
-	vpush(ret, { .type = TT_EOF, .len = 0, .data = NULL, .place = str - start });
-
 	return ret;
 }
 
