@@ -111,7 +111,7 @@ size_t msizeof(const void *p) {
 // Custom assert, requires something to be true to continue with the test.
 #define assert(x) do { if(x) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n(%s:%d) "TERMREDBOLD"Fatal error"TERMRESET": Assertion '"#x"' failed. Aborting test.\n", __FILE__, __LINE__); subtests_run = 0; subtests_passed = 0; starttime = get_precise_time(); assert_aborted = 1; } while (0)
 #define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n(%s:%d) "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(%d) != '"#y"'(%d) . Aborting test.\n", __FILE__, __LINE__, (int) (x), (int) (y)); subtests_run = 0; subtests_passed = 0; starttime = get_precise_time(); assert_aborted = 1; } while (0)
-
+#define assertstrs(x, y) do { if(!strcmp(x, y)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n(%s:%d) "TERMREDBOLD"Fatal error"TERMRESET": \""#x"\" != \""#y"\" . Aborting test.\n", __FILE__, __LINE__); subtests_run = 0; subtests_passed = 0; starttime = get_precise_time(); assert_aborted = 1; } while (0)
 
 #define SUBTESTPASSOUTPUT(x) {\
 		totaltime += ANUDSNEADHUNSEADHUNDE;\
@@ -119,14 +119,14 @@ size_t msizeof(const void *p) {
 		char* timeunit = "ms";\
 		if(ANUDSNEADHUNSEADHUNDE < 1e-3) tmul = 1000000.0, timeunit = "\u03BCs";\
 		if(asserts < 12)\
-			printf("%.*s"TERMGREENBOLD"%.*s"TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s "TERMRESET"",\
+			printf("%.*s" TERMGREENBOLD "%.*s" TERMRESET TERMGREENBGBLACK " PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET,\
 				asserts * 2,\
 				"\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b",\
 				asserts * 4,\
 				"\u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 ",\
 				ANUDSNEADHUNSEADHUNDE * tmul, timeunit);\
 		else\
-			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s "TERMRESET"",\
+			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET,\
 			/*Length of the number in `assert`*/ asserts < 10 ? 1 : asserts < 100 ? 2 : asserts < 1000 ? 3 : asserts < 10000 ? 4 : asserts < 100000 ? 5 : asserts < 1000000 ? 6 : asserts < 10000000 ? 7 : asserts < 100000000 ? 8 : asserts < 1000000000 ? 9 : 10,\
 			"\b\b\b\b\b\b\b\b\b\b\b\b", asserts, ANUDSNEADHUNSEADHUNDE * tmul, timeunit);\
 		subtests_passed++; asserts = 0; starttime = get_precise_time(); break;\
@@ -176,10 +176,15 @@ int CONCAT(test_, N)(void) {\
 	char* timeunit = "ms";\
 	if(ANUDSNEADHUNSEADHUNDE < 1e-3) tmul = 1000000.0, timeunit = "\u03BCs";\
 	if(!subtests_run)\
-		printf("%.*s"TERMGREENBOLD"%.*s"TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s "TERMRESET"\n", asserts * 2,\
-			"\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b", asserts * 4,\
-			"\u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 ",\
-			ANUDSNEADHUNSEADHUNDE * tmul, timeunit);/* If this was a straight test with no subtests, just print out test passed message*/\
+		if(asserts < 12)\
+			printf("%.*s"TERMGREENBOLD"%.*s"TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s "TERMRESET"\n", asserts * 2,\
+				"\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b", asserts * 4,\
+				"\u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 ",\
+				ANUDSNEADHUNSEADHUNDE * tmul, timeunit);/* If this was a straight test with no subtests, just print out test passed message*/\
+		else\
+			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET "\n",\
+			/*Length of the number in `assert`*/ asserts < 10 ? 1 : asserts < 100 ? 2 : asserts < 1000 ? 3 : asserts < 10000 ? 4 : asserts < 100000 ? 5 : asserts < 1000000 ? 6 : asserts < 10000000 ? 7 : asserts < 100000000 ? 8 : asserts < 1000000000 ? 9 : 10,\
+			"\b\b\b\b\b\b\b\b\b\b\b\b", asserts, ANUDSNEADHUNSEADHUNDE * tmul, timeunit);\
 	else {\
 		int allpassed = subtests_run == subtests_passed;/* Otherwise check subtests*/\
 		if (allpassed) puts("");\
