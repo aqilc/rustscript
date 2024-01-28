@@ -87,7 +87,7 @@ struct vecdata_ {
 #define vpushv(x, y) (memcpy(vpush_((void**) &(x), _DATA(y)->used), y, _DATA(y)->used))
 
 // Add values to the beginning of the vec
-#define vunshift(x, ...) (*(typeof(x))vunshift_((void**)&(x), sizeof(*(x))) = (typeof(*x)) __VA_ARGS__)
+// #define vunshift(x, ...) (*(typeof(x))vunshift_((void**)&(x), sizeof(*(x))) = (typeof(*x)) __VA_ARGS__)
 
 // Simplifies vclear and vtostr calls
 #define vclear(v) vclear_((void**)&(v))
@@ -127,9 +127,8 @@ VEC_H_EXTERN void  vremove_(void* v, uint32_t size, uint32_t pos);
 VEC_H_EXTERN void* vpush_(void** v, uint32_t size);
 VEC_H_EXTERN void  vpushs_(void** v, char* str);
 VEC_H_EXTERN void  vpushsf_(void** v, char* fmt, ...);
-VEC_H_EXTERN void  vpusharr_(void** v, uint32_t thingsize, void* thing);
 VEC_H_EXTERN void  vpushn_(void** v, uint32_t n, uint32_t size, void* thing);
-VEC_H_EXTERN void* vunshift_(void** v, uint32_t size);
+// VEC_H_EXTERN void* vunshift_(void** v, uint32_t size);
 VEC_H_EXTERN void* vpop_(void* v, uint32_t size);
 VEC_H_EXTERN char* vfmt(char* str, ...);
 
@@ -241,16 +240,16 @@ VEC_H_EXTERN void vpushsf_(void** v, char* fmt, ...) {
 VEC_H_EXTERN void vpushn_(void** v, uint32_t n, uint32_t size, void* thing) {
 	char* place = VEC_INTERNAL_PUSH_NAME(v, n * size);
 	if(size == 1 || size == 4) memset(place, *((char*) thing), size);
-	else for(int i = 0; i < n; i ++) memcpy(place + size * i, thing, size);
+	else for(uint32_t i = 0; i < n; i ++) memcpy(place + size * i, thing, size);
 }
 
 VEC_H_EXTERN void* vpop_(void* v, uint32_t size) { _DATA(v)->used -= size; return _DATA(v)->data + _DATA(v)->used; }
 
 // Adds an element at the start of the vector, ALSO CHANGES PTR
-VEC_H_EXTERN void* vunshift_(void** v, uint32_t size) {
-	memmove((char*) (*v = alloc_(_DATA(*v), size)) + size, *v, _DATA(*v)->used);
-	return *v;
-}
+// VEC_H_EXTERN void* vunshift_(void** v, uint32_t size) {
+// 	memmove((char*) (*v = alloc_(_DATA(*v), size)) + size, *v, _DATA(*v)->used);
+// 	return *v;
+// }
 
 // Deletes data from the middle of the array
 VEC_H_EXTERN void vremove_(void* v, uint32_t size, uint32_t pos) {
