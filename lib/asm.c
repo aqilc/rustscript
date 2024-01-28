@@ -95,3 +95,46 @@ ret: Returns from a subroutine (i.e., pops the return address off of the stack a
   <+256>:   pop    %rbp
   <+257>:   ret
 */
+
+
+/**
+ * Goal: Run this assembly program.
+
+default rel
+
+extern printf
+
+segment .rdata
+    msg db `Hello world!\r\n`, 0
+
+segment .text
+
+global main
+main:
+    sub     rsp, 40
+
+    lea     rcx, [msg]
+    call    printf
+
+    xor     rax, rax
+    add     rsp, 40
+    ret
+
+*/
+
+enum AssFn {
+	AF_RET, AF_CALL, AF_PUSH, AF_POP,
+	
+	AF_MOV,
+	
+	AF_LEA,
+	
+	AF_XOR, AF_ADD, AF_SUB,
+};
+typedef enum AssFn AssFn;
+
+struct Instruction {
+	AssFn f;
+	char* name;
+	
+};
