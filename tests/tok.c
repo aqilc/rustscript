@@ -44,8 +44,8 @@ TEST("Tokenize a string: '\"Hello World\"'") {
 	freetoks(tok);
 }
 
-TEST("Tokenize Operators: '+ - * / += <<= => == != a.b'") {
-	char* str = "+ - * / += <<= => == != a.b";
+TEST("Tokenize Operators: '+ - * / += <<= => ++ == != a.b'") {
+	char* str = "+ - * / += <<= => ++ == != a.b";
 	RS_Token* tok = tokenize(str);
 	asserteq(tok[0].type, TT_OPADD);
 	asserteq(tok[1].type, TT_OPSUB);
@@ -54,12 +54,13 @@ TEST("Tokenize Operators: '+ - * / += <<= => == != a.b'") {
 	asserteq(tok[4].type, TT_OPADDSET);
 	asserteq(tok[5].type, TT_OPBSHIFTLEFTSET);
 	asserteq(tok[6].type, TT_PARROW);
-	asserteq(tok[7].type, TT_CEQ);
-	asserteq(tok[8].type, TT_CNOTEQ);
-	asserteq(tok[9].type, TT_IDENT);
-	asserteq(tok[10].type, TT_OPDOT);
-	asserteq(tok[11].type, TT_IDENT);
-	asserteq(tok[12].type, TT_EOF);
+	asserteq(tok[7].type, TT_OPINCR);
+	asserteq(tok[8].type, TT_CEQ);
+	asserteq(tok[9].type, TT_CNOTEQ);
+	asserteq(tok[10].type, TT_IDENT);
+	asserteq(tok[11].type, TT_OPDOT);
+	asserteq(tok[12].type, TT_IDENT);
+	asserteq(tok[13].type, TT_EOF);
 	freetoks(tok);
 }
 
