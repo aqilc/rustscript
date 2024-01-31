@@ -1,3 +1,6 @@
+#include <util.h>
+#include <vec.h>
+
 // https://github.com/StanfordPL/x64asm
 
 /*
@@ -122,19 +125,72 @@ main:
 
 */
 
-enum AssFn {
-	AF_RET, AF_CALL, AF_PUSH, AF_POP,
-	
-	AF_MOV,
-	
-	AF_LEA,
-	
-	AF_XOR, AF_ADD, AF_SUB,
-};
-typedef enum AssFn AssFn;
 
-struct Instruction {
-	AssFn f;
-	char* name;
+// https://l-m.dev/cs/jitcalc/#:~:text=make%20it%20executable%3F-,C%20Territory,-V%20does%20not
+
+enum x64Op {
+	RET, CALL, PUSH, POP,
 	
+	MOV,
+	
+	LEA,
+	
+	XOR, ADD, SUB,
 };
+typedef enum x64Op x64Op;
+
+struct x64Operand {
+	enum {
+		LABEL, REGISTER, 
+	} type;
+};
+typedef struct x64Operand x64Operand;
+
+struct x64Ins {
+	x64Op op;
+	x64Operand params[4];
+};
+typedef struct x64Ins x64Ins;
+typedef x64Ins x64[];
+
+x64 p = {
+	{MOV, {}}
+};
+
+typedef struct Ins Ins;
+
+// Aligns to the next multiple of a, where a is a power of 2
+static inline u32 align(u32 n, u32 a) { return (n + a - 1) & ~(a - 1); }
+
+
+
+#if defined _WIN32 | defined __CYGWIN__
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+static SYSTEM_INFO sysinfo;
+
+void (*prog(void* mem, u32 size))(void) {
+	DWORD pagesize = sysinfo.dwPageSize;
+	if(pagesize == 0) {
+		GetSystemInfo(&sysinfo);
+		pagesize = sysinfo.dwPageSize;
+	}
+
+	printf("Page size: %ld", pagesize);
+
+	u32 alignedsize = align(size, pagesize);
+
+	printf("Original size: %d, new size: %d", size, alignedsize);
+
+	void* buf = VirtualAlloc(NULL, alignedsize, MEM_COMMIT, PAGE_READWRITE);
+	memcpy(buf, mem, size);
+
+	DWORD old;
+	VirtualProtect(buf, size, PAGE_EXECUTE_READ, &old);
+
+	return buf;
+}
+
+#endif
+
+
