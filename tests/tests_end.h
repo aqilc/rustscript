@@ -24,11 +24,14 @@ static void handler (int sig, siginfo_t* bruh, void* idc) {
 #endif
 
 int main() {
-
-
-	// So we can display unicode... windows rly took an L here ngl
 	#ifdef _WIN32
+		// So we can display unicode... windows rly took an L here ngl
 		SetConsoleOutputCP(65001);
+
+		// https://stackoverflow.com/questions/6812224/getting-terminal-size-in-c-for-windows
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
+			testoutputwidth = csbi.srWindow.Right - csbi.srWindow.Left + 1 - 17 /* width of " PASS " + timing */;
 	#endif
 
 	#ifndef STOP_CATCHING_SIGNALS
@@ -128,6 +131,6 @@ int main() {
 	if(!failed) printf(TERMGREENBOLD "ALL TESTS PASSED!!" TERMRESET" Nice job bro.");
 	else if(failed == tests) printf(TERMREDBOLD "All tests failed. Spectacular." TERMRESET);
 	else printf("%d / %d tests passed.", tests - failed, tests);
-	printf(" Took " TERMBLUEBOLD "%.2f ms" TERMRESET "\n", totaltime * 1000.0);
+	printf(" Took " TERMBLUEBOLD "%.2f ms" TERMRESET "\n", tests_totaltime * 1000.0);
 	return 0;
 }
