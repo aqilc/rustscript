@@ -5,6 +5,23 @@
 #include "tok.h"
 
 ht(char*, RS_TokenType) keywords;
+hentry(keywords) keywordinit[] = {
+	{ "let",    TT_KLET    },
+	{ "fn",     TT_KFN     },
+	{ "struct", TT_KSTRUCT },
+	{ "if",     TT_KIF     },
+	{ "else",   TT_KELSE   },
+	{ "return", TT_KRETURN },
+	{ "trait",  TT_KTRAIT  },
+	
+	{ "u32",    TT_TU32    },
+	{ "u16",    TT_TU16    },
+	{ "u8",     TT_TU8     },
+	{ "i32",    TT_TI32    },
+	{ "i16",    TT_TI16    },
+	{ "i8",     TT_TI8     },
+	{ "bool",   TT_TBOOL   },
+};
 
 static inline u32 utf8(u8** str) {
 	if(**str == 0) return 0;
@@ -28,26 +45,9 @@ static inline bool alpha (u32 point) { return (point >= 'a' && point <='z') || (
 RS_Token* tokenize(char* str) {
 	
 	// Sets up keyword search
-	if(!hgets(keywords, "if"))
-		hinit(keywords, {
-			{ "let",    TT_KLET    },
-			{ "fn",     TT_KFN     },
-			{ "struct", TT_KSTRUCT },
-			{ "if",     TT_KIF     },
-			{ "else",   TT_KELSE   },
-			{ "return", TT_KRETURN },
-			{ "trait",  TT_KTRAIT  },
-			
-			{ "u32",    TT_TU32    },
-			{ "u16",    TT_TU16    },
-			{ "u8",     TT_TU8     },
-			{ "i32",    TT_TI32    },
-			{ "i16",    TT_TI16    },
-			{ "i8",     TT_TI8     },
-			{ "bool",   TT_TBOOL   },
-		});
-
-			
+	if(!keywords.n)
+		hmergeentries(keywords, keywordinit);
+	
 	char* start = str;
 	RS_Token* ret = vnew();
 

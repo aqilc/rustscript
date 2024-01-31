@@ -18,8 +18,8 @@ struct GENERIC_TABLE_ {
 #define HASH_STRIFY2_(x) #x
 #define HASH_STRIFY_(x) HASH_STRIFY2_(x)
 
-#define HASH_CONCAT_RAW_(x, y, z) x##y##z
-#define HASH_CONCAT_(x, y, z) HASH_CONCAT_RAW_(x, y, z)
+// #define HASH_CONCAT_RAW_(x, y, z) x##y##z
+// #define HASH_CONCAT_(x, y, z) HASH_CONCAT_RAW_(x, y, z)
 
 // Defines an item for the hashtable. Types for `k` get messed up when you pass in `char*` but we ignore it bc it barely matters.
 // #define ITEMNAMEMANGLER HASH
@@ -62,11 +62,12 @@ struct GENERIC_TABLE_ {
 #define hfirst(htb) ((typeof((htb).items)) ((htb).keys[0]))
 
 
-#define HTINITIALIZER_(htb) struct { hkeyt(htb) key; hvalt(htb) item; } htinitarr[]
+#define hentry(htb) struct { hkeyt(htb) key; hvalt(htb) item; }
+#define HTINITIALIZER_(htb) hentry(htb) htinitarr[]
 
 // In a perfect world where _Generic was actually good. :(
 /*
-#define hinit(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
+#define haddentries(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
   htinit((struct GENERIC_TABLE_*) &(htb), sizeof(htinitarr));\
   for(unsigned int i = 0; i < sizeof(htinitarr) / htinitarr[0]; i++)\
     _Generic(**(htb).keys,\
@@ -82,7 +83,7 @@ struct GENERIC_TABLE_ {
 } while(0)
 */
 
-#define hinit(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
+#define haddentries(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
   htinit((struct GENERIC_TABLE_*) &(htb), sizeof(htinitarr));\
   for(unsigned int i = 0; i < sizeof(htinitarr) / sizeof(htinitarr[0]); i++)\
     _Generic(**(htb).keys,\
@@ -91,7 +92,7 @@ struct GENERIC_TABLE_ {
     );\
 } while(0)
 
-#define htinitcpys(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
+#define haddentriescpys(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
 	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(htinitarr));\
 	for(unsigned int i = 0; i < sizeof(htinitarr) / sizeof(htinitarr[0]); i++)\
 		_Generic(**(htb).keys,\
@@ -100,6 +101,23 @@ struct GENERIC_TABLE_ {
 		);\
 } while(0)
 
+#define hmergeentries(htb, entries) do {\
+	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(entries));\
+	for(unsigned int i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)\
+		_Generic(**(htb).keys,\
+			char*: (hsets(htb, entries[i].key) = entries[i].item),\
+			default: (hset(htb, entries[i].key) = entries[i].item)\
+		);\
+} while(0)
+
+#define hmergeentriescpys(htb, entries) do {\
+	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(entries));\
+	for(unsigned int i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)\
+		_Generic(**(htb).keys,\
+			char*: (hsetscpys(entries[i].item, htb, entries[i].key)),\
+			default: (hsetcpys(entries[i].item, htb, entries[i].key))\
+		);\
+} while(0)
 
 // Raw Hashtable methods
 void  htinit(struct GENERIC_TABLE_* t, unsigned int size);

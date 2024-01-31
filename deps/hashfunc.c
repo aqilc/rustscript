@@ -3,6 +3,7 @@
 #include <xxhash.h>
 
 uint32_t hash(const char* data, uint32_t len) {
+	// https://stackoverflow.com/questions/152016/detecting-cpu-architecture-compile-time
 	// #if defined(__x86_64__) || defined(_M_X64)
 	// 	return XXH3_64bits(data, len);
 	// #else// defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
