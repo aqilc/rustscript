@@ -79,7 +79,7 @@ struct vecdata_ {
 #define vpushnst(x, n, y) vpushn_((void**) &(x), (n), sizeof(*(x)), &((typeof(*(x))) y))
 
 // String push aliases so u don't have to &
-#define vpushs(x, y) vpushs_((void**) &(x), (y))
+#define vpushs(x, y) strcpy((char*) vpush_((void**) &(x), strlen(y) + 1) - 1, y);
 #define vpushsf(x, ...) vpushsf_((void**) &(x), __VA_ARGS__)
 
 
@@ -125,7 +125,6 @@ VEC_H_EXTERN void  vempty(void* v);
 VEC_H_EXTERN char* vtostr_(void** v);
 VEC_H_EXTERN void  vremove_(void* v, uint32_t size, uint32_t pos);
 VEC_H_EXTERN void* vpush_(void** v, uint32_t size);
-VEC_H_EXTERN void  vpushs_(void** v, char* str);
 VEC_H_EXTERN void  vpushsf_(void** v, char* fmt, ...);
 VEC_H_EXTERN void  vpushn_(void** v, uint32_t n, uint32_t size, void* thing);
 // VEC_H_EXTERN void* vunshift_(void** v, uint32_t size);
@@ -217,13 +216,6 @@ static inline void* VEC_INTERNAL_PUSH_NAME(void** v, uint32_t size) {
 #ifndef VEC_H_STATIC_INLINE
 	void* vpush_(void** v, uint32_t size) { return VEC_INTERNAL_PUSH_NAME(v, size); }
 #endif
-
-// Allocates memory for a string and then pushes
-VEC_H_EXTERN void vpushs_(void** v, char* str) {
-	uint32_t len = strlen(str);
-	memcpy(VEC_INTERNAL_PUSH_NAME(v, len + 1), str, len + 1);
-	_DATA(*v)->used --;
-}
 
 // Gets length of formatted string to allocate from vector first, and then basically writes to the ptr returned by push
 VEC_H_EXTERN void vpushsf_(void** v, char* fmt, ...) {
