@@ -7,7 +7,7 @@ A very ambitious project, with the goal of making a combination systems language
 This syntax is the current goal:
 
 ```rust
-struct Datatype {
+struct Datatype { // Syntax is similar to JS classes, but more concise and requires types.
 	number: u32 = 0; // Optionals and defaults in-built.
 	string: str; // Only stores length and capacity with extremely transparent and simple logic and easy conversion to C string.
 	array: u32[]; // All arrays are variable size, contain the same things as strings.
@@ -18,6 +18,8 @@ struct Datatype {
 	}; // { ... } type declarations are treated as records, not Structs. If you want to make a struct you have to define it with `struct x {}`.
 	optional?: *Database; // Option types can only be pointers. Type recursion can only be done with pointers.
 }
+
+// Strings, objects and arrays will always be heap allocated unless they are never modified. They will not be available on the "systems" flavor of the language.
 
 const obj = {
 	prop: "lol"
@@ -46,7 +48,7 @@ fn main() {
 		},
 		object2: {
 			hi: "i really want to finish this project for once",
-			"2": true
+			[2]: true
 		}
 	}
 
