@@ -111,7 +111,7 @@ size_t msizeof(const void *p) {
 // Custom assert, requires something to be true to continue with the test.
 #define assert(x) do { if(x) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); puts("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": Assertion '"#x"' failed. Aborting test."); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 #define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(%d) != '"#y"'(%d) . Aborting test.\n", (int) (x), (int) (y)); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define assertstreq(x, y) do { if(!strcmp(x, y)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(\"%s\") != '"#y"'(\"%s\") . Aborting test.\n", x, y); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assertstreq(x, ...) do { if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\") . Aborting test.\n", x, __VA_ARGS__); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 
 #define SUBTESTPASSOUTPUT(x) {\
 		tests_totaltime += passed_time;\
