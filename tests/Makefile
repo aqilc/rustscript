@@ -17,7 +17,8 @@ else
 	# GCC
 	CC := gcc
 	# CFLAGS := -O3 -I"../lib" -I"../deps/include"
-	CFLAGS := -g -Wall -Wextra -Wpedantic -I"../lib" -I"../deps/include"
+	# CFLAGS := -g -Wall -Wextra -Wpedantic -I"../lib" -I"../deps/include"
+	CFLAGS := -g -I"../lib" -I"../deps/include"
 	# TCFLAGS := -O3 -I"../lib" -I"../deps/include"
 	TCFLAGS := -g -I"../lib" -I"../deps/include"
 	OBJEND := .o
@@ -44,7 +45,7 @@ TESTSUITE := tests.h tests_end.h
 
 
 
-all: tok
+all: tok asm
 
 clean:
 	del *.o
@@ -58,6 +59,11 @@ tok: tok.exe
 	@tok.exe
 	@C:\Windows\system32\cmd.exe /C "echo."
 
+asm: asm.exe
+	@echo Running '$^'
+	@asm.exe
+	@C:\Windows\system32\cmd.exe /C "echo."
+
 .PHONY: all tok clean
 
 
@@ -66,8 +72,14 @@ tok: tok.exe
 tok.exe: toktest$(OBJEND) tok$(OBJEND) error$(OBJEND) $(UTIL)
 	@$(CC) $^ $(EXENAME)$@
 
+asm.exe: asmtest$(OBJEND) asm$(OBJEND) error$(OBJEND) $(UTIL)
+	@$(CC) $^ $(EXENAME)$@
+
 # ============= Test Builds =============
 toktest$(OBJEND): tok.c ../lib/tok.c $(TESTSUITE)
+	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # ----------- Base lib builds -----------
@@ -80,6 +92,10 @@ tok$(OBJEND): ../lib/tok.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 error$(OBJEND): ../lib/error.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+asm$(OBJEND): ../lib/asm/asm_x86.c
+	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+# coderun$(OBJEND): ../lib/asm/coderun.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 # backend_load$(OBJEND): ../../backend_load.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
