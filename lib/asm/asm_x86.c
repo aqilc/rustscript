@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <util.h>
 #include <vec.h>
 #include "asm_x86.h"
@@ -129,23 +130,95 @@ main:
 
 // https://l-m.dev/cs/jitcalc/#:~:text=make%20it%20executable%3F-,C%20Territory,-V%20does%20not
 
-x64 p = {
-	MOV, {},
-	ADD, {},
-	MOV, { rax, imm(0) },
-	MOV, { rcx, imm(0) },
-};
 
-static char opcode[14] = {0};
+u32 x64emit(x64Ins* ins, char* opcode_dest) {
+	if(ins->op == 0) return 0;
+	const x64LookupGeneralIns* unresins = x64Table + (ins->op - 1);
+	x64LookupActualIns* primary = NULL;
+	x64LookupActualIns* secondary = NULL;
 
-u32 x64emit(x64Ins ins) {
+	u32 operandnum = 0;
+	while(ins->params[operandnum].type)
+		operandnum ++;
 
-}
-
-void x64assemble(x64 p) {
-	char* code = vnew();
-	u32 ins = 0;
-	while (p[ins].op) {
-		emit();
+	// ---------------------- Instruction resolution and Validation ---------------------- //
+	
+	for(u32 i = 0; i < unresins->numactualins; i ++) {
+		if(unresins->ins[i].arglen != operandnum) continue;
+		enum { NOTMATCH, PRIMARY, SECONDARY } match = PRIMARY;
+		for(u32 j = 0; j < operandnum; j ++)
+			// For instructions that have compatible operands but not the exact ones
+			if (unresins->ins[i].args[j] != ins->params[j].type && unresins->ins[i].args[j] & ins->params[j].type) match = SECONDARY;
+			else if (unresins->ins[i].args[j] != ins->params[j].type) { match = NOTMATCH; break; }
+		if(match == PRIMARY) {
+			if(primary) printf("ERROR: Found two primary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, primary->orig_ins, primary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
+			primary = unresins->ins + i;
+		} else if(match == SECONDARY) {
+			if(secondary) printf("ERROR: Found two secondary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, secondary->orig_ins, secondary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
+			secondary = unresins->ins + i;
+		}
 	}
+
+	if(!primary) {
+		if(!secondary) {
+			printf("No matching instruction for %s with %d arguments", unresins->name, operandnum);
+			return 0;
+		}
+		else printf("No primary instruction for %s with %d arguments, using `%s` secondary", unresins->name, operandnum, secondary->orig_ins);
+		primary = secondary;
+	}	else printf("Using primary instruction for %s with %d arguments, which is %lld in the array and has %d opcode(s).", unresins->name, operandnum, primary - unresins->ins, primary->oplen);
+
+	// ------------------------------ Special Instructions ------------------------------ //
+
+	// Enter is the weirdest instruction ever :'(
+	if(ins->op == ENTER) {
+		memcpy(opcode_dest, (u8[]) { 0xC8,
+			ins->params[0].value, 
+			ins->params[1].value >> 8, 
+			ins->params[1].value
+		}, 1);
+		return 4;
+	}
+
+	// ----------------------------- Instruction encoding ----------------------------- //
+	u32 len = 0;
+
+	// Prefixes
+	if(primary->preflen) {
+		memcpy(opcode_dest, primary->prefixes, primary->preflen);
+		*opcode_dest += primary->preflen; len += primary->preflen;
+	}
+
+	// REX prefix
+	u8 rex = primary->rex | ((primary->reg_operand && ins->params[primary->reg_operand - 1].value & 0x8) ? 0x44 : 0);
+	if(rex)
+		*opcode_dest = rex, *opcode_dest++, len ++;
+
+	// opcode
+	memcpy(opcode_dest, primary->opcode, primary->oplen);
+	*opcode_dest += primary->oplen; len += primary->oplen;
+
+	if(!primary->modrm && primary->reg_operand)
+		printf("reg operand: %d, value: %lld", primary->reg_operand, ins->params[primary->reg_operand - 1].value),
+		*(opcode_dest - 1) &= (ins->params[primary->reg_operand - 1].value & 0x7);
+
+	return len;
 }
+
+char* x64as(x64 p, u32* len) {
+	char* code = malloc(14);
+	u32 ins = 0;
+	u32 emitted = 0;
+
+	while (p[ins].op) {
+		u32 curlen = x64emit(p + ins, code + emitted);
+		if(!curlen) {
+			free(code);
+			return NULL;
+		}
+		emitted += curlen;
+		ins ++;
+	}
+	return code;
+}
+
