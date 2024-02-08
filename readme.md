@@ -70,9 +70,14 @@ const ez2 = () => 1;
 ### Syntax TODO
 
 - [ ] `fn main() => 0;`
-	- [ ] Basic Tokenizing
+	- [x] Basic Tokenizing
 	- [ ] Basic Code Generation and execution
-		- [ ] Start working on custom Assembler library
+		- [x] Start working on custom Assembler library
+  		- [x] Assemble Basic instructions like `push rax`
+  		- [-] Prefixes
+  		- [ ] Hints
+  		- [ ] Vector EXtension Instructions
+    		- [ ] EVEX
 - [ ] `fn main() => 1 + 1;`
 	- [ ] Expression Parsing
 		- [ ] Order of Operations
@@ -87,9 +92,16 @@ const ez2 = () => 1;
 - Simple Ownership rules
 	- `*` = Mutable pointer, `&` = Immutable Reference
 		- Cannot take multiple `*`s of an object at once.
+- "number" type
+  - Will start off as an i64, but will be changed to a double depending on operands. Similar to how JS numbers work.
 - Immutable strings
 	- `"hi" + 2`
 		- Checks if `2` has a `toString` trait and calls it if it does, then makes a new string with the combination of the two.
 		- If string size is known at compile time, it will not be put with the data.
+
+### Execution
+
+- JIT
+- Assembly output -> `nasm` -> Linking with C STDLIB -> Binary
 
 > Reusing a lot of code from `aqilc/jsc`
