@@ -111,9 +111,11 @@ size_t msizeof(const void *p) {
 // Custom assert, requires something to be true to continue with the test.
 #define assert(x) do { if(x) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); puts("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": Assertion '"#x"' failed. Aborting test."); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 #define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(%d) != '"#y"'(%d) . Aborting test.\n", (int) (x), (int) (y)); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assertmemeq(x, ...) do { if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"' != '"#__VA_ARGS__"' . Aborting test.\n"); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 #define assertstreq(x, ...) do { if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; } if(subtests_run) printf(SUBTESTINDENT); printf("\n("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\") . Aborting test.\n", x, __VA_ARGS__); subtests_run = 0; subtests_passed = 0; tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 
 #define SUBTESTPASSOUTPUT(x) {\
+		double passed_time = (get_precise_time() - tests_starttime);\
 		tests_totaltime += passed_time;\
 		double tmul = 1000.0;\
 		char* timeunit = "ms";\
@@ -137,7 +139,6 @@ size_t msizeof(const void *p) {
 
 // A sub test, which checks if something is going according to plan but if it's not, it can still continue
 #define subtest(x, y) do {\
-	double passed_time = (get_precise_time() - tests_starttime);\
 	SUBTESTINIT(x);\
 	if(y) SUBTESTPASSOUTPUT(y)\
 	printf("\n"SUBTESTINDENT"(%s:%d) "TERMREDBOLD"Subtest '" x "' (#%d) failed."TERMRESET"\n", __FILE__, __LINE__, subtests_run);\
@@ -147,7 +148,6 @@ size_t msizeof(const void *p) {
 // For subtests with multiple checks
 #define substart(x) do { SUBTESTINIT(x); tests_starttime = get_precise_time(); } while(0)
 #define subend(x) do {\
-	double passed_time = (get_precise_time() - tests_starttime);\
 	if(x) SUBTESTPASSOUTPUT(x)\
 	printf("\n"SUBTESTINDENT"(%s:%d) "TERMREDBOLD"Subtest #%d failed."TERMRESET"\n", __FILE__, __LINE__, subtests_run);\
 	tests_starttime = get_precise_time(); asserts = 0;\

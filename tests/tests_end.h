@@ -5,11 +5,7 @@ jmp_buf owo;
 unsigned int sigthing = 0;
 void* sigaddr = 0;
 
-// #undef _WIN32
 #if defined(_WIN32)
-// WINDOWS WHY ARE YOUR HEADERS SO BIG
-// #define WIN32_LEAN_AND_MEAN
-// #include <windows.h>
 LONG WINAPI plswork(PEXCEPTION_POINTERS pinfo) {
 	sigthing = pinfo->ExceptionRecord->ExceptionCode;
 	longjmp(owo, 1);
