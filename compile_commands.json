@@ -3,6 +3,6 @@
 		"directory": "d:/projects/c/rustscript/",
 		"file": "main.c",
 		"output": "main.o",
-		"arguments": ["clang", "-xc", "-std=c23", "main.c", "-I", "./deps/include", "-I", "./lib", "-c"]
+		"arguments": ["clang", "-xc", "-std=c2x", "main.c", "-I", "./deps/include", "-I", "./lib", "-c"]
 	}
 ]
