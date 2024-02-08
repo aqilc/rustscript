@@ -1,8 +1,7 @@
 // Threading library
 // https://github.com/tinycthread/tinycthread
-#include <codegen.h>
 #include "lib/util.h"
-// #include <tok.h>
+#include <tok.h>
 
 #define VEC_H_IMPLEMENTATION
 #include <vec.h>
