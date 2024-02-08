@@ -110,6 +110,7 @@ typedef char* vstr;
 
 // All you need to get started with this vector lib!
 VEC_H_EXTERN void* vnew();
+VEC_H_EXTERN void* vnewn(uint32_t n);
 // #define vnew() ((void*) ((struct vecdata_*) calloc(1, sizeof(struct vecdata_)) + 1))
 
 // Returns a *new* concatenated vector, use `pushv` if you don't want a new vec :D
@@ -144,6 +145,12 @@ VEC_H_EXTERN char* vfmt(char* str, ...);
 	VEC_H_EXTERN void* vnew() {
 		struct vecdata_* v = VEC_H_CALLOC(1, sizeof(struct vecdata_) + 16 * sizeof(char));
 		v->cap = 16;
+		return v + 1;
+	}
+
+	VEC_H_EXTERN void* vnewn(uint32_t n) {
+		struct vecdata_* v = VEC_H_CALLOC(1, sizeof(struct vecdata_) + n * sizeof(char));
+		v->cap = n;
 		return v + 1;
 	}
 #endif
