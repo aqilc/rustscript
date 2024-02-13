@@ -19,6 +19,7 @@ int subtests_passed = 0;
 int asserts = 0;
 _Bool assert_aborted = 0;
 int testoutputwidth = 70;
+char* tests_cursubtest = NULL;
 
 
 // https://stackoverflow.com/a/53388334/10013227
@@ -153,16 +154,16 @@ char* tests_print_mem(void* mem, uint32_t size) {
 #define subtest(x, y) do {\
 	SUBTESTINIT(x);\
 	if(y) SUBTESTPASSOUTPUT(y)\
-	printf("\n"SUBTESTINDENT"(%s:%d) "TERMREDBOLD"Subtest '" x "' (#%d) failed."TERMRESET"\n", __FILE__, __LINE__, subtests_run);\
+	printf("\n"SUBTESTINDENT TERMREDBOLD"Subtest '" x "' (#%d) failed."TERMRESET, subtests_run);\
 	tests_starttime = get_precise_time(); asserts = 0;\
 } while (0)
 
 // For subtests with multiple checks
-#define substart(x) do { SUBTESTINIT(x); tests_starttime = get_precise_time(); } while(0)
+#define substart(x) do { SUBTESTINIT(x); tests_cursubtest = (x); tests_starttime = get_precise_time(); } while(0)
 #define subend(x) do {\
 	if(x && !assert_aborted) SUBTESTPASSOUTPUT(x)\
 	assert_aborted = 0;\
-	printf("\n"SUBTESTINDENT"(%s:%d) "TERMREDBOLD"Subtest #%d failed."TERMRESET, __FILE__, __LINE__, subtests_run);\
+	printf("\n"SUBTESTINDENT TERMREDBOLD"Subtest '%s' (#%d) failed."TERMRESET, tests_cursubtest, subtests_run);\
 	tests_starttime = get_precise_time(); asserts = 0;\
 } while(0)
 
@@ -182,7 +183,7 @@ int CONCAT(test_, N)(void) {\
 	printf(TERMCYANBOLD "%d)" TERMRESET " " name " " TERMGRAY "(" __FILE__ ":" TOSTRING(__LINE__) ")" TERMRESET " %-*s" TERMRESET, N + 1, (int) (TESTNAMELIMIT - sizeof(name " (" __FILE__ ":" TOSTRING(__LINE__) ")") + 1 - 3), "");\
 	tests_starttime = get_precise_time();\
 	CONCAT(test_internal_, N)();\
-	if(assert_aborted == 1) { assert_aborted = 0; return 1; }\
+	if(assert_aborted == 1) { puts(""); assert_aborted = 0; return 1; }\
 	double passed_time = (get_precise_time() - tests_starttime); /* Measures the amount of clocks the test took*/\
 	tests_totaltime += passed_time;\
 	double tmul = 1000.0;\
@@ -200,7 +201,7 @@ int CONCAT(test_, N)(void) {\
 			"\b\b\b\b\b\b\b\b\b\b\b\b", asserts, passed_time * tmul, timeunit);\
 	else {\
 		int allpassed = subtests_run == subtests_passed;/* Otherwise check subtests*/\
-		if (allpassed) puts("");\
+		if(allpassed) puts("");\
 		else printf("\n"SUBTESTINDENT TERMREDBGBLACK" ERROR "TERMRESET" %d subtests tests failed.\n", subtests_run - subtests_passed);\
 		subtests_run = 0;\
 		subtests_passed = 0;\
