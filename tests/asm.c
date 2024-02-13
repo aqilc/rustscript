@@ -96,36 +96,52 @@ DECLARE_HANDLE (HWINSTA);
 #include <asm/asm_x86.h>
 
 
+#define INSTEST(bytes, ...) substart(#__VA_ARGS__ " => " #bytes); \
+	asserteq(x64emit(&(x64Ins) { __VA_ARGS__ }, buf), sizeof(#bytes) / 5);
+#define INSTESTMEMEQ(...) assertmemeq(buf, { __VA_ARGS__ }); subend(1);
 
 TEST("Assemble push instructions (1 argument, 1-3 bytes with optional REX)") {
 	char buf[3] = {0};
 
-	substart("push rax");
-	asserteq(x64emit(&(x64Ins) { PUSH, rax }, buf), 1);
-	asserteq(buf[0], 0x50);
-	subend(1);
+	INSTEST(0x50, PUSH, rax);
+	INSTESTMEMEQ(0x50);
 
-	substart("push rdx");
-	asserteq(x64emit(&(x64Ins) { PUSH, rdx }, buf), 1);
-	asserteq(buf[0], 0x52);
-	subend(1);
+	// substart("push rax => 0x50");
+	// asserteq(x64emit(&(x64Ins) { PUSH, rax }, buf), 1);
+	// asserteq(buf[0], 0x50);
+	// subend(1);
+
+
+	INSTEST(0x52, PUSH, rdx);
+	INSTESTMEMEQ(0x52);
+	// substart("push rdx => 0x52");
+	// asserteq(x64emit(&(x64Ins) { PUSH, rdx }, buf), 1);
+	// asserteq(buf[0], 0x52);
+	// subend(1);
+
+	INSTEST(0x66 0x53, PUSH, bx);
+	INSTESTMEMEQ(0x66, 0x53);
+	// substart("push bx => 0x66 0x53");
+	// asserteq(x64emit(&(x64Ins) { PUSH, bx }, buf), 2);
+	// assertmemeq(buf, { 0x66, 0x53 });
+	// subend(1);
 }
 
 TEST("Assemble mov instructions (2 arguments, 2-4 bytes with optional REX and Immediates)") {
 	char buf[10] = {0};
 	
-	substart("mov al, 3");
+	substart("mov al, 3 => 0xB0 0x03");
 	asserteq(x64emit(&(x64Ins) { MOV, { al, im8(3) }}, buf), 2);
 	assertmemeq(buf, { 0xB0, 0x03 });
 	subend(1);
 
-	substart("mov rax, rdx");
+	substart("mov rax, rdx => 0x48 0x89 0xD0");
 	asserteq(x64emit(&(x64Ins) { MOV, { rax, rdx }}, buf), 3);
 	assertmemeq(buf, { 0x48, 0x89, 0xD0 });
 	subend(1);
 
-	substart("mov rax, r8");
-	asserteq(x64emit(&(x64Ins) { MOV, { rax, r8 }}, buf), 4);
+	substart("mov rax, r8 => 0x4C 0x89 0xC0");
+	asserteq(x64emit(&(x64Ins) { MOV, { rax, r8 }}, buf), 3);
 	assertmemeq(buf, { 0x4C, 0x89, 0xC0 });
 	subend(1);
 }
