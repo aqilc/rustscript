@@ -131,11 +131,11 @@ main:
 // https://l-m.dev/cs/jitcalc/#:~:text=make%20it%20executable%3F-,C%20Territory,-V%20does%20not
 
 
-u32 x64emit(x64Ins* ins, char* opcode_dest) {
-	if(ins->op == 0) return 0;
+static inline x64LookupActualIns* identify(x64Ins* ins) {
 	const x64LookupGeneralIns* unresins = x64Table + (ins->op - 1);
 	x64LookupActualIns* primary = NULL;
 	x64LookupActualIns* secondary = NULL;
+	bool secondaryprefferred = false;
 
 	u32 operandnum = 0;
 	while(ins->params[operandnum].type)
@@ -151,11 +151,13 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 			if (unresins->ins[i].args[j] != ins->params[j].type && unresins->ins[i].args[j] & ins->params[j].type) match = SECONDARY;
 			else if (unresins->ins[i].args[j] != ins->params[j].type) { match = NOTMATCH; break; }
 		if(match == PRIMARY) {
-			if(primary) printf("ERROR: Found two primary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, primary->orig_ins, primary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
+			// if(primary) printf("ERROR: Found two primary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, primary->orig_ins, primary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
 			primary = unresins->ins + i;
 		} else if(match == SECONDARY) {
-			if(secondary) printf("ERROR: Found two secondary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, secondary->orig_ins, secondary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
+			if(secondaryprefferred && !unresins->ins[i].preffered) continue;
+			// if(secondary) printf("ERROR: Found two secondary instructions for %s with %d arguments: `%s`(`%s`) and `%s`(`%s`)", unresins->name, operandnum, secondary->orig_ins, secondary->orig_opcode, unresins->ins[i].orig_ins, unresins->ins[i].orig_opcode);
 			secondary = unresins->ins + i;
+			if(secondary->preffered) secondaryprefferred = true;
 		}
 	}
 
@@ -164,9 +166,18 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 			printf("No matching instruction for %s with %d arguments", unresins->name, operandnum);
 			return 0;
 		}
-		else printf("No primary instruction for %s with %d arguments, using `%s` secondary", unresins->name, operandnum, secondary->orig_ins);
+		// else printf("No primary instruction for %s with %d arguments, using `%s` secondary", unresins->name, operandnum, secondary->orig_ins);
 		primary = secondary;
-	}	else printf("Using primary instruction for %s with %d arguments, which is %lld in the array and has %d opcode(s).", unresins->name, operandnum, primary - unresins->ins, primary->oplen);
+	}
+	// else printf("Using primary instruction for %s with %d arguments, which is %lld in the array and has %d opcode(s).", unresins->name, operandnum, primary - unresins->ins, primary->oplen);
+
+	return primary;
+}
+
+u32 x64emit(x64Ins* ins, char* opcode_dest) {
+	if(ins->op == 0) return 0;
+	x64LookupActualIns* res = identify(ins);
+	if(!res) return 0;
 
 	// ------------------------------ Special Instructions ------------------------------ //
 
@@ -184,23 +195,42 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 	u32 len = 0;
 
 	// Prefixes
-	if(primary->preflen) {
-		memcpy(opcode_dest, primary->prefixes, primary->preflen);
-		*opcode_dest += primary->preflen; len += primary->preflen;
+	if(res->preflen) {
+		memcpy(opcode_dest, res->prefixes, res->preflen);
+		*opcode_dest += res->preflen; len += res->preflen;
 	}
+	
+	// 66H prefix
+	if(res->pref66) *opcode_dest = 0x66, opcode_dest ++, len ++;
+
+	// 67H prefix
+	if(res->mem_operand && ins->params[res->mem_operand].value & ((u64) 1 << 61))
+		*opcode_dest = 0x67, opcode_dest ++, len ++;
 
 	// REX prefix
-	u8 rex = primary->rex | ((primary->reg_operand && ins->params[primary->reg_operand - 1].value & 0x8) ? 0x44 : 0);
-	if(rex)
-		*opcode_dest = rex, *opcode_dest++, len ++;
+	u8 rex = res->rex | ((res->reg_operand && ins->params[res->reg_operand - 1].value & 0x8) ? 0x44 : 0);
+	if(rex) *opcode_dest = rex, opcode_dest ++, len ++;
 
 	// opcode
-	memcpy(opcode_dest, primary->opcode, primary->oplen);
-	*opcode_dest += primary->oplen; len += primary->oplen;
+	memcpy(opcode_dest, res->opcode, res->oplen);
+	opcode_dest += res->oplen; len += res->oplen;
 
-	if(!primary->modrm && primary->reg_operand)
-		printf("reg operand: %d, value: %lld", primary->reg_operand, ins->params[primary->reg_operand - 1].value),
-		*(opcode_dest - 1) &= (ins->params[primary->reg_operand - 1].value & 0x7);
+	if(!res->modrm && res->reg_operand)
+		// printf("reg operand: %d, value: %lld", res->reg_operand, ins->params[res->reg_operand - 1].value),
+		*(opcode_dest - 1) |= (ins->params[res->reg_operand - 1].value & 0x7);
+
+	// Immediate
+	if(res->immediate) {
+		u32 size = ins->params[res->immediate - 1].type >> 1;
+		// printf("Immediate: %d\n", res->immediate);
+		switch(size) {
+			case 1: *opcode_dest = ins->params[res->immediate - 1].value; break;
+			case 2: *(u16*) opcode_dest = ins->params[res->immediate - 1].value; break;
+			case 4: *(u32*) opcode_dest = ins->params[res->immediate - 1].value; break;
+			case 8: *(u64*) opcode_dest = ins->params[res->immediate - 1].value; break;
+		}
+		opcode_dest += size; len += size;
+	}
 
 	return len;
 }

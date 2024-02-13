@@ -98,24 +98,23 @@ DECLARE_HANDLE (HWINSTA);
 
 
 TEST("Assemble push instructions (1 argument, 1-3 bytes with optional REX)") {
-	char buf[3];
+	char buf[3] = {0};
 
 	substart("push rax");
 	asserteq(x64emit(&(x64Ins) { PUSH, rax }, buf), 1);
 	asserteq(buf[0], 0x50);
 	subend(1);
 
-	substart("push rcx");
-	asserteq(x64emit(&(x64Ins) { PUSH, rcx }, buf), 1);
-	asserteq(buf[0], 0x51);
+	substart("push rdx");
+	asserteq(x64emit(&(x64Ins) { PUSH, rdx }, buf), 1);
+	asserteq(buf[0], 0x52);
 	subend(1);
 }
 
 TEST("Assemble: `mov al, 3`") {
-	char buf[10];
-	asserteq(x64emit(&(x64Ins) { MOV, { al, im64(3) }}, buf), 0);
-	asserteq(buf[0], 0x0);
-	// assertstreq(ret, (char[]) { 0xB0, 0x03, 0 });
+	char buf[10] = {0};
+	asserteq(x64emit(&(x64Ins) { MOV, { al, im8(3) }}, buf), 2);
+	assertmemeq(buf, { 0xB0, 0x03, 0, 0 });
 }
 
 #include "tests_end.h"
