@@ -36,20 +36,21 @@ void init(void) __attribute__((weak));
 
 
 // Terminal colors defines
-#define TERMGREENBGBLACK "\033[42;30m"
-#define TERMWHITEBGBLACK "\033[47;30m"
-#define TERMBLACKBGWHITE "\033[40;37m"
-#define TERMREDBGBLACK   "\033[41;30m"
-#define TERMBLUEBG       "\033[44;30m"
-#define TERMGREENBOLD    "\033[1;32m"
-#define TERMREDBOLD      "\033[1;31m"
-#define TERMBLUEBOLD     "\033[1;34m"
-#define TERMGRAYBOLD     "\033[1;90m"
-#define TERMYELLOW       "\033[33m"
-#define TERMGRAY         "\033[90m"
-#define TERMPINK         "\033[95m"
-#define TERMCYANBOLD     "\033[1;33m"
-#define TERMRESET        "\033[0m"
+#define TERMREDBGBLACKBOLD "\033[1;41;30m"
+#define TERMGREENBGBLACK   "\033[42;30m"
+#define TERMWHITEBGBLACK   "\033[47;30m"
+#define TERMBLACKBGWHITE   "\033[40;37m"
+#define TERMREDBGBLACK     "\033[41;30m"
+#define TERMBLUEBG         "\033[44;30m"
+#define TERMGREENBOLD      "\033[1;32m"
+#define TERMREDBOLD        "\033[1;31m"
+#define TERMBLUEBOLD       "\033[1;34m"
+#define TERMGRAYBOLD       "\033[1;90m"
+#define TERMYELLOW         "\033[33m"
+#define TERMGRAY           "\033[90m"
+#define TERMPINK           "\033[95m"
+#define TERMCYANBOLD       "\033[1;33m"
+#define TERMRESET          "\033[0m"
 
 
 // used to be 70
@@ -120,10 +121,10 @@ char* tests_print_mem(void* mem, uint32_t size) {
 #define SUBTESTINDENT "  "
 
 // Custom assert, requires something to be true to continue with the test.
-#define assert(x) do { if(x) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": Assertion '"#x"' failed. Aborting test."); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(%d) != '"#y"'(%d). Aborting test.", (int) (x), (int) (y)); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define assertmemeq(x, ...) do { if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(%s) != '"#__VA_ARGS__"'. Aborting test.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__))); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define assertstreq(x, ...) do { if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Fatal error"TERMRESET": '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\"). Aborting test.", x, __VA_ARGS__); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assert(x) do { if(x) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" Assertion '"#x"' failed."); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%d) != '"#y"'(%d).", (int) (x), (int) (y)); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assertmemeq(x, ...) do { if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%s) != '"#__VA_ARGS__"'.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__))); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assertstreq(x, ...) do { if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\").", x, __VA_ARGS__); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
 
 #define SUBTESTPASSOUTPUT(x) {\
 		double passed_time = (get_precise_time() - tests_starttime);\

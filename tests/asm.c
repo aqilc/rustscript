@@ -111,10 +111,23 @@ TEST("Assemble push instructions (1 argument, 1-3 bytes with optional REX)") {
 	subend(1);
 }
 
-TEST("Assemble: `mov al, 3`") {
+TEST("Assemble mov instructions (2 arguments, 2-4 bytes with optional REX and Immediates)") {
 	char buf[10] = {0};
+	
+	substart("mov al, 3");
 	asserteq(x64emit(&(x64Ins) { MOV, { al, im8(3) }}, buf), 2);
-	assertmemeq(buf, { 0xB0, 0x03, 0, 0 });
+	assertmemeq(buf, { 0xB0, 0x03 });
+	subend(1);
+
+	substart("mov rax, rdx");
+	asserteq(x64emit(&(x64Ins) { MOV, { rax, rdx }}, buf), 3);
+	assertmemeq(buf, { 0x48, 0x89, 0xD0 });
+	subend(1);
+
+	substart("mov rax, r8");
+	asserteq(x64emit(&(x64Ins) { MOV, { rax, r8 }}, buf), 4);
+	assertmemeq(buf, { 0x4C, 0x89, 0xC0 });
+	subend(1);
 }
 
 #include "tests_end.h"
