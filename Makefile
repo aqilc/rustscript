@@ -6,7 +6,7 @@
 
 CC := clang-cl
 LINKER := lld-link
-CFLAGS := /O2 /MD /Z7 /EHsc -m64 -Ideps/include -Ilib -c /D_CRT_SECURE_NO_WARNINGS
+CFLAGS := /Od /MD /Zi /EHsc -m64 -Ideps/include -Ilib -c /D_CRT_SECURE_NO_WARNINGS
 LINKFLAGS := /DEBUG:FULL
 #/NODEFAULTLIB:libcmt.lib /SUBSYSTEM:CONSOLE	#/LIBPATH:deps/lib
 LIBS := msvcrt.lib
@@ -31,7 +31,7 @@ $(patsubst %.c,%$(DLLENDING),$(notdir $(1)))
 endef
 
 # Get the O file names from the C files
-SRCS := $(wildcard *.c deps/*.c lib/*.c)
+SRCS := $(wildcard *.c deps/*.c lib/*.c lib/asm/*.c)
 OBJS := $(call c2o,$(SRCS))
 
 # A lot of backend specific stuff
@@ -63,6 +63,8 @@ $(BUILDDIR)/%.o: %.c
 $(BUILDDIR)/%.o: lib/%.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 $(BUILDDIR)/%.o: deps/%.c
+	$(CC) $(CFLAGS) -c $^ -o $@
+$(BUILDDIR)/%.o: lib/asm/%.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 clean:
