@@ -1,27 +1,23 @@
 // Threading library
 // https://github.com/tinycthread/tinycthread
-#include "lib/util.h"
-#include <tok.h>
+#include <stdio.h>
+#include "lib/asm/asm_x86.h"
 
-#define VEC_H_IMPLEMENTATION
-#include <vec.h>
-
-#define HASH_H_IMPLEMENTATION
-#include <hash.h>
+void print() {
+	printf("HI!!!");
+}
 
 int main() {
-	char* hi = PROG(
-		fn main() { return 0; }
-	);
+	x64 hi2 = {
+		// INT3, {},
+		MOV, {rax, im64((u64)(void*)print)},
+		CALL, {rax},
+		END
+	};
+	
+	u32 len = 0;
+	char* assembled = x64as(hi2, &len);
+	run(assembled, len)(); // prints "HI!!!"
 
-	RS_Token* tok = tokenize(hi);
-
-	for(int i = 0; i < vlen(tok); i++) {
-		RS_Token t = tok[i];
-		printf("%d: %d %d %s\n", i, t.type, t.len, t.data);
-	}
-
-	// printf("%s", codegen(x86, tok));
-	freetoks(tok);
 	return 0;
 }
