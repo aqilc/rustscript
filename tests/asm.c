@@ -96,7 +96,7 @@ DECLARE_HANDLE (HWINSTA);
 #include <asm/asm_x86.h>
 
 
-#define INSTEST(bytes, ...) substart(#__VA_ARGS__ " => " #bytes); \
+#define INSTEST(bytes, ...) substart(#__VA_ARGS__ " => " #bytes);\
 	asserteq(x64emit(&(x64Ins) { __VA_ARGS__ }, buf), sizeof(#bytes) / 5);
 #define INSTESTMEMEQ(...) assertmemeq(buf, { __VA_ARGS__ }); subend(1);
 
@@ -106,44 +106,54 @@ TEST("Assemble push instructions (1 argument, 1-3 bytes with optional REX)") {
 	INSTEST(0x50, PUSH, rax);
 	INSTESTMEMEQ(0x50);
 
-	// substart("push rax => 0x50");
-	// asserteq(x64emit(&(x64Ins) { PUSH, rax }, buf), 1);
-	// asserteq(buf[0], 0x50);
-	// subend(1);
-
-
 	INSTEST(0x52, PUSH, rdx);
 	INSTESTMEMEQ(0x52);
-	// substart("push rdx => 0x52");
-	// asserteq(x64emit(&(x64Ins) { PUSH, rdx }, buf), 1);
-	// asserteq(buf[0], 0x52);
-	// subend(1);
 
 	INSTEST(0x66 0x53, PUSH, bx);
 	INSTESTMEMEQ(0x66, 0x53);
-	// substart("push bx => 0x66 0x53");
-	// asserteq(x64emit(&(x64Ins) { PUSH, bx }, buf), 2);
-	// assertmemeq(buf, { 0x66, 0x53 });
-	// subend(1);
+
+	INSTEST(0x41 0x50, PUSH, r8);
+	INSTESTMEMEQ(0x41, 0x50);
+}
+
+TEST("Assemble call instructions (1 argument, 5-7 bytes with optional REX and Immediates)") {
+	char buf[7] = {0};
+
+	INSTEST(0xE8 0x00 0x00 0x00 0x00, CALL, im64(0));
+	INSTESTMEMEQ(0xE8, 0x00, 0x00, 0x00, 0x00);
+
+	INSTEST(0xFF 0xD0, CALL, rax);
+	INSTESTMEMEQ(0xFF, 0xD0);
+
+	INSTEST(0x41 0xFF 0xD0, CALL, r8);
+	INSTESTMEMEQ(0x41, 0xFF, 0xD0);
+
 }
 
 TEST("Assemble mov instructions (2 arguments, 2-4 bytes with optional REX and Immediates)") {
 	char buf[10] = {0};
 	
-	substart("mov al, 3 => 0xB0 0x03");
-	asserteq(x64emit(&(x64Ins) { MOV, { al, im8(3) }}, buf), 2);
-	assertmemeq(buf, { 0xB0, 0x03 });
-	subend(1);
+	INSTEST(0xB0 0x03, MOV, al, im8(3));
+	INSTESTMEMEQ(0xB0, 0x03);
 
-	substart("mov rax, rdx => 0x48 0x89 0xD0");
-	asserteq(x64emit(&(x64Ins) { MOV, { rax, rdx }}, buf), 3);
-	assertmemeq(buf, { 0x48, 0x89, 0xD0 });
-	subend(1);
+	INSTEST(0x48 0x89 0xD0, MOV, rax, rdx);
+	INSTESTMEMEQ(0x48, 0x89, 0xD0);
 
-	substart("mov rax, r8 => 0x4C 0x89 0xC0");
-	asserteq(x64emit(&(x64Ins) { MOV, { rax, r8 }}, buf), 3);
-	assertmemeq(buf, { 0x4C, 0x89, 0xC0 });
-	subend(1);
+	INSTEST(0x48 0x89 0xC0, MOV, rax, r8);
+	INSTESTMEMEQ(0x48, 0x89, 0xC0);
+
+	INSTEST(0x67 0x8A 0x4B 0x03, MOV, cl, m8(3, $ebx));
+	INSTESTMEMEQ(0x67, 0x8A, 0x4B, 0x03);
+}
+
+TEST("Assemble lea instructions (2 arguments, 3-5 bytes with optional REX and Immediates)") {
+	char buf[10] = {0};
+
+	INSTEST(0x48 0x8D 0x4C 0x24 0x08, LEA, rcx, mem(8, $rsp));
+	INSTESTMEMEQ(0x48, 0x8D, 0x4C, 0x24, 0x08);
+
+	INSTEST(0x8D 0x4C 0x24 0x08, LEA, ecx, mem(8, $rsp));
+	INSTESTMEMEQ(0x8D, 0x4C, 0x24, 0x08);
 }
 
 #include "tests_end.h"

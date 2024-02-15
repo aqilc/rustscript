@@ -9,18 +9,18 @@ static inline u32 align(u32 n, u32 a) { return (n + a - 1) & ~(a - 1); }
 #include <windows.h>
 static SYSTEM_INFO sysinfo;
 
-void (*run(void* mem, u32 size))(void) {
+void (*run(void* mem, u32 size))() {
 	DWORD pagesize = sysinfo.dwPageSize;
 	if(pagesize == 0) {
 		GetSystemInfo(&sysinfo);
 		pagesize = sysinfo.dwPageSize;
 	}
 
-	printf("Page size: %ld", pagesize);
+	printf("Page size: %ld\n", pagesize);
 
 	u32 alignedsize = align(size, pagesize);
 
-	printf("Original size: %d, new size: %d", size, alignedsize);
+	printf("Original size: %d, new size: %d\n", size, alignedsize);
 
 	void* buf = VirtualAlloc(NULL, alignedsize, MEM_COMMIT, PAGE_READWRITE);
 	memcpy(buf, mem, size);
