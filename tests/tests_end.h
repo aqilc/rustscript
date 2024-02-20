@@ -1,23 +1,4 @@
 // #include "tests.h"
-#include <setjmp.h>
-
-jmp_buf owo;
-unsigned int sigthing = 0;
-void* sigaddr = 0;
-
-#if defined(_WIN32)
-LONG WINAPI plswork(PEXCEPTION_POINTERS pinfo) {
-	sigthing = pinfo->ExceptionRecord->ExceptionCode;
-	longjmp(owo, 1);
-}
-#else
-#include <signal.h>
-static void handler (int sig, siginfo_t* bruh, void* idc) {
-	sigthing = sig;
-	sigaddr = bruh->si_addr;
-	longjmp(owo, 1);
-}
-#endif
 
 int main() {
 	#ifdef _WIN32
