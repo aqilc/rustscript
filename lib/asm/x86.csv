@@ -1192,13 +1192,13 @@ VEX.256.0F.WIG 2B /r	VMOVNTPS m256, ymm1	MR	W, R						V	V	AVX	vmovntps		Move pac
 														
 0F 6F /r	MOVQ mm, mm/m64	RM	W, R						V	V	MMX	movq	YES	Move quadword from mm/m64 to mm.
 0F 7F /r	MOVQ mm/m64, mm	MR	W, R						V	V	MMX	movq		Move quadword from mm to mm/m64.
-F3 0F 7E	MOVQ xmm1, xmm2/m64	RM	W, R						V	V	SSE2	movq	YES	Move quadword from xmm2/mem64 to xmm1.
+F3 0F 7E /r	MOVQ xmm1, xmm2/m64	RM	W, R						V	V	SSE2	movq	YES	Move quadword from xmm2/mem64 to xmm1.
 VEX.128.F3.0F.WIG 7E /r	VMOVQ xmm1, xmm2	RM	Z, R						V	V	AVX	vmovq		Move quadword from xmm2 to xmm1.
 VEX.128.F3.0F.WIG 7E /r	VMOVQ xmm1, m64	RM	Z, R						V	V	AVX	vmovq		Load quadword from m64 to xmm1.
-66 0F D6	MOVQ xmm2/m64, xmm1	MR	W, R						V	V	SSE2	movq		Move quadword from xmm1 to xmm2/mem64.
+66 0F D6 /r	MOVQ xmm2/m64, xmm1	MR	W, R						V	V	SSE2	movq		Move quadword from xmm1 to xmm2/mem64.
 VEX.128.66.0F.WIG D6 /r	VMOVQ xmm1/m64, xmm2	MR	Z, R						V	V	AVX	vmovq	YES	Move quadword from xmm2 register to xmm1/m64.
 														
-F3 0F D6	MOVQ2DQ xmm, mm	RM	W, R						V	V	MMX	movq2dq		Move quadword from mmx to low quadword of xmm.
+F3 0F D6 /r	MOVQ2DQ xmm, mm	RM	W, R						V	V	MMX	movq2dq		Move quadword from mmx to low quadword of xmm.
 														
 A4	MOVS m8, m8	NP	I, I	E.DF ESI rsi EDI rdi					V	V		movs		For legacy mode, Move byte from address DS:(E)SI to ES:(E)DI. For 64-bit mode move byte from address (R|E)SI to (R|E)DI.
 A5	MOVS m16, m16	NP	I, I	E.DF ESI rsi EDI rdi					V	V		movs		For legacy mode, move word from address DS:(E)SI to ES:(E)DI. For 64-bit mode move word at address (R|E)SI to (R|E)DI.
