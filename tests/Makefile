@@ -1,30 +1,38 @@
 # https://devblogs.microsoft.com/cppblog/addresssanitizer-asan-for-windows-with-msvc/
 
 
-MSVC := ${MSVC}
+# MSVC
+# CC := cl
+# CFLAGS := /std:c++17 /EHsc /MDd /Zi /D_CRT_SECURE_NO_WARNINGS
+# TCFLAGS := /std:c++17 /EHsc /MDd /Zi /D_CRT_SECURE_NO_WARNINGS
+# OBJEND := .obj
+# OUTPUTFILENAME := /Fo
+# EXENAME := /Fe
+# COMPILEFLAG := /c
+# LINK := /link /debug
+# GCC
 
-ifeq ($(MSVC), 1)
-	# MSVC
-	CC := cl
-	CFLAGS := /std:c++17 /EHsc /MDd /Zi /D_CRT_SECURE_NO_WARNINGS
-	TCFLAGS := /std:c++17 /EHsc /MDd /Zi /D_CRT_SECURE_NO_WARNINGS
-	OBJEND := .obj
-	OUTPUTFILENAME := /Fo
-	EXENAME := /Fe
-	COMPILEFLAG := /c
-	LINK := /link /debug
+OBJEND := .o
+OUTPUTFILENAME := -o 
+EXENAME := -o 
+COMPILEFLAG := -c
+
+ifeq ($(OS),Windows_NT)
+	CC := clang-cl
+	CFLAGS := /O2 /Z7 -I"../lib" -I"../deps/include"
+	TCFLAGS := /Od /Z7 -I"../lib" -I"../deps/include"
+	EXEEND := .exe
+	FILEDELETE := del
+	STUPIDUNIXSHIT := 
+	LINK := /Z7
 else
-	# GCC
 	CC := gcc
-	# CFLAGS := -O3 -I"../lib" -I"../deps/include"
+	CFLAGS := -O3 -g -I"../lib" -I"../deps/include"
 	# CFLAGS := -g -Wall -Wextra -Wpedantic -I"../lib" -I"../deps/include"
-	CFLAGS := -g -I"../lib" -I"../deps/include"
-	# TCFLAGS := -O3 -I"../lib" -I"../deps/include"
-	TCFLAGS := -g -I"../lib" -I"../deps/include"
-	OBJEND := .o
-	OUTPUTFILENAME := -o 
-	EXENAME := -o 
-	COMPILEFLAG := -c
+	TCFLAGS := -O3 -g -I"../lib" -I"../deps/include"
+	EXEEND := .bin
+	FILEDELETE := rm
+	STUPIDUNIXSHIT := ./
 	LINK := 
 endif
 
@@ -48,32 +56,32 @@ TESTSUITE := tests.h tests_end.h
 all: tok asm
 
 clean:
-	del *.o
-	del *.obj
-	del *.bin
-	del *.exe
-	del *.pdb
+	$(FILEDELETE) *.o
+	$(FILEDELETE) *.bin
+	$(FILEDELETE) *.exe
+	$(FILEDELETE) *.pdb
+	$(FILEDELETE) *.obj
 
-tok: tok.exe
+tok: tok$(EXEEND)
 	@echo Running '$^'
-	@tok.exe
-	@C:\Windows\system32\cmd.exe /C "echo."
+	@$(STUPIDUNIXSHIT)tok$(EXEEND)
+# @C:\Windows\system32\cmd.exe /C "echo."
 
-asm: asm.exe
+asm: asm$(EXEEND)
 	@echo Running '$^'
-	@asm.exe
-	@C:\Windows\system32\cmd.exe /C "echo."
+	@$(STUPIDUNIXSHIT)asm$(EXEEND)
+# @C:\Windows\system32\cmd.exe /C "echo."
 
 .PHONY: all tok clean
 
 
 
 # ============== Test bins ==============
-tok.exe: toktest$(OBJEND) tok$(OBJEND) error$(OBJEND) $(UTIL)
-	@$(CC) $^ $(EXENAME)$@
+tok$(EXEEND): toktest$(OBJEND) tok$(OBJEND) error$(OBJEND) $(UTIL)
+	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-asm.exe: asmtest$(OBJEND) asm$(OBJEND) error$(OBJEND) $(UTIL)
-	@$(CC) $^ $(EXENAME)$@
+asm$(EXEEND): asmtest$(OBJEND) asm$(OBJEND) error$(OBJEND) $(UTIL)
+	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 # ============= Test Builds =============
 toktest$(OBJEND): tok.c ../lib/tok.c $(TESTSUITE)
