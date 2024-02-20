@@ -54,6 +54,7 @@ dkms.conf
 # Personal tooling gitignores.
 .cache
 bin
+*.bin
 build
 .vs
 .vscode
@@ -61,3 +62,5 @@ build
 *.tmp*
 main*.idx
 main*.run
+initOpen.txt
+tests/asm/
