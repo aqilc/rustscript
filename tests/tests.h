@@ -1,5 +1,5 @@
 /*
- * tests.h v3.2.4 - Aqil Contractor @AqilC 2024
+ * tests.h v3.2.6 - Aqil Contractor @AqilC 2024
  * Licenced under Attribution-NonCommercial-ShareAlike 3.0
  * 
  * This file is the beginning file of the 'tests.h' testing framework made by Aqil Contractor. To use this framework,
@@ -20,7 +20,7 @@
  * #include "tests_end.h"
  *
  * This will output:
- * 1) Test name (test.c:3)                          PASS  0001 ns
+ * 1) Test name (test.c:3)                          PASS   0001 ns
  * 2) Another test (test.c:7)
  *   (test.c:9) Error: Assertion '1 == 2' failed.
  * 1 / 2 tests passed. Took 0.00 ms
@@ -50,7 +50,7 @@
 
 #include <setjmp.h>
 
-jmp_buf owo;
+jmp_buf tests_jmp_buf;
 unsigned int sigthing = 0;
 void* sigaddr = 0;
 
@@ -67,6 +67,7 @@ int subtests_run = 0;
 int subtests_passed = 0;
 int asserts = 0;
 _Bool assert_aborted = 0;
+_Bool last_subtest_failed = 0;
 int testoutputwidth = 70;
 char* tests_cursubtest = NULL;
 
@@ -130,7 +131,7 @@ static inline long double get_precise_time() {
 
 LONG WINAPI plswork(PEXCEPTION_POINTERS pinfo) {
 	sigthing = pinfo->ExceptionRecord->ExceptionCode;
-	longjmp(owo, 1);
+	longjmp(tests_jmp_buf, 1);
 }
 #else
 #include <sys/time.h>
@@ -147,7 +148,7 @@ static inline long double get_precise_time() {
 static void handler (int sig, siginfo_t* bruh, void* idc) {
 	sigthing = sig;
 	sigaddr = bruh->si_addr;
-	longjmp(owo, 1);
+	longjmp(tests_jmp_buf, 1);
 }
 #endif
 
@@ -202,10 +203,11 @@ char* tests_print_mem(void* mem, int size) {
 // } while (0)
 
 // For subtests with multiple checks
-#define SUB(x) subtests_run++;\
+#define SUB(x) do { subtests_run++;\
 	printf("\n" SUBTESTINDENT x TERMRESET " %-*s", /*subtests_run,*/(int) (TESTNAMELIMIT - sizeof(SUBTESTINDENT) + 1 - sizeof(""x"") + 1), "");\
-	tests_cursubtest = (x); tests_starttime = get_precise_time(); while((subtest_done = !subtest_done) && subend_())
+	tests_cursubtest = (x); tests_starttime = get_precise_time(); } while(0); while((subtest_done = !subtest_done) || subend_())
 static inline _Bool subend_(void) {
+	// printf("asserts: %d, subtest_done: %d, assert_aborted: %d\n", asserts, subtest_done, assert_aborted);
 	if(!assert_aborted) {
 		long double passed_time = (get_precise_time() - tests_starttime);
 		tests_totaltime += passed_time;
@@ -227,6 +229,7 @@ static inline _Bool subend_(void) {
 		subtests_passed++;
 		asserts = 0;
 		subtest_done = 0;
+		last_subtest_failed = 0;
 		tests_starttime = get_precise_time();
 		return 0;
 	}
@@ -234,13 +237,14 @@ static inline _Bool subend_(void) {
 	assert_aborted = 0;
 	printf("\n"SUBTESTINDENT TERMREDBOLD"Subtest '%s' (#%d) failed."TERMRESET, tests_cursubtest, subtests_run);
 	tests_starttime = get_precise_time(); asserts = 0;
+	last_subtest_failed = 1;
 	return 0;
 }
 
 
 #define benchiters(x) tests_benchiters = (x)
-#define BENCH(x) printf("\n" SUBTESTINDENT TERMGRAY "Bench: " x TERMRESET " %-*s", (int) (TESTNAMELIMIT - 7 - sizeof(SUBTESTINDENT) + 1 - sizeof(""x"") + 1), ""); tests_starttime = get_precise_time(); tests_benchprogress = 0; while ((tests_benchprogress++) < tests_benchiters || benchend_())
-#define SUBBENCH() printf("\n" SUBTESTINDENT SUBTESTINDENT TERMGRAY "Bench for %s" TERMRESET " %-*s", tests_cursubtest, (int) (TESTNAMELIMIT - 10 - sizeof(SUBTESTINDENT SUBTESTINDENT) + 1 - strlen(tests_cursubtest)), ""); tests_starttime = get_precise_time(); tests_benchprogress = 0; while ((tests_benchprogress++) < tests_benchiters || benchend_())
+#define BENCH(x) do { printf("\n" SUBTESTINDENT TERMGRAY "Bench: " x TERMRESET " %-*s", (int) (TESTNAMELIMIT - 7 - sizeof(SUBTESTINDENT) + 1 - sizeof(""x"") + 1), ""); tests_starttime = get_precise_time(); tests_benchprogress = 0; } while(0); while ((tests_benchprogress++) < tests_benchiters || benchend_())
+#define SUBBENCH() if(last_subtest_failed) tests_benchprogress = tests_benchiters; else { printf("\n" SUBTESTINDENT SUBTESTINDENT TERMGRAY "Bench for %s" TERMRESET " %-*s", tests_cursubtest, (int) (TESTNAMELIMIT - 10 - sizeof(SUBTESTINDENT SUBTESTINDENT) + 1 - strlen(tests_cursubtest)), ""); tests_starttime = get_precise_time(); tests_benchprogress = 0; } while ((tests_benchprogress++) < tests_benchiters || benchend_())
 
 static inline _Bool benchend_() {
 	long double passed_time = (get_precise_time() - tests_starttime);

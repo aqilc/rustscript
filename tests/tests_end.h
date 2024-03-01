@@ -42,7 +42,7 @@ int main() {
 	for (int i = 0, len = tests; i < len; i ++) {
 
 		// SigSegV Exception handling
-		if(!setjmp(owo)) {
+		if(!setjmp(tests_jmp_buf)) {
 			if (testfuncs[i]()) failed ++;
 		} else {
 			char* subtest = "subtest", * test = "test";
