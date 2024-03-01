@@ -10,29 +10,40 @@
 # EXENAME := /Fe
 # COMPILEFLAG := /c
 # LINK := /link /debug
-# GCC
-
-OBJEND := .o
-OUTPUTFILENAME := -o 
-EXENAME := -o 
-COMPILEFLAG := -c
 
 ifeq ($(OS),Windows_NT)
-	CC := clang-cl
-	CFLAGS := /O2 /Z7 -I"../lib" -I"../deps/include"
-	TCFLAGS := /Od /Z7 -I"../lib" -I"../deps/include"
 	EXEEND := .exe
 	FILEDELETE := del
 	STUPIDUNIXSHIT := 
-	LINK := /Z7
+	
+	CC := clang-cl
+	CFLAGS := /O2 /Zi -I"../lib" /I"../deps/include"
+	COMPILEFLAG := /c
+	TCFLAGS := /O2 /Zi -I"../lib" /I"../deps/include"
+	EXENAME := /Fe
+	OBJEND := .obj
+	OUTPUTFILENAME := /Fo
+	LINK := /link /DEBUG:FULL
+
+	# CC := gcc
+	# CFLAGS := -O3 -g -I"../lib" -I"../deps/include"
+	# TCFLAGS := -O3 -g -I"../lib" -I"../deps/include"
+	# EXENAME := -o
+	# OBJEND := .o 
+	# OUTPUTFILENAME := -o 
+	# LINK :=
 else
 	CC := gcc
 	CFLAGS := -O3 -g -I"../lib" -I"../deps/include"
+	COMPILEFLAG := -c
 	# CFLAGS := -g -Wall -Wextra -Wpedantic -I"../lib" -I"../deps/include"
 	TCFLAGS := -O3 -g -I"../lib" -I"../deps/include"
 	EXEEND := .bin
 	FILEDELETE := rm
 	STUPIDUNIXSHIT := ./
+	OBJEND := .o
+	EXENAME := -o 
+	OUTPUTFILENAME := -o 
 	LINK := 
 endif
 
@@ -57,10 +68,12 @@ all: tok asm
 
 clean:
 	$(FILEDELETE) *.o
-	$(FILEDELETE) *.bin
 	$(FILEDELETE) *.exe
+	$(FILEDELETE) *.bin
 	$(FILEDELETE) *.pdb
 	$(FILEDELETE) *.obj
+	$(FILEDELETE) *.ilk
+	$(FILEDELETE) gmon.out
 
 tok: tok$(EXEEND)
 	@echo Running '$^'
