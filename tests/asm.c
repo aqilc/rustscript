@@ -24,6 +24,8 @@ double hi;
 TEST("Assemble push instructions (1 argument, with optional REX and Addressing Overrides)") {
 	char buf[3] = {0};
 
+	benchiters(12345);
+
 	INSTEST(0x50, PUSH, rax);
 	INSTESTMEMEQ(0x50);
 
@@ -76,6 +78,25 @@ TEST("Assemble lea instructions (2 arguments, with optional REX and Immediates)"
 	INSTESTMEMEQ(0x67, 0x41, 0x8D, 0x4B, 0x08);
 }
 
+TEST("Assemble FPU Instructions (1-2 arguments with different, FPU operand types)") {
+	char buf[10] = {0};
+
+	INSTEST(0xD9 0xC0, FLD, st0);
+	INSTESTMEMEQ(0xD9, 0xC0);
+
+	INSTEST(0xDD 0x04 0x25 0x02 0x00 0x00 0x00, FLD, m64($none, 2));
+	INSTESTMEMEQ(0xDD, 0x04, 0x25, 0x02, 0x00, 0x00, 0x00);
+
+	INSTEST(0xD8 0xCA, FMUL, st0, st(2));
+	INSTESTMEMEQ(0xD8, 0xCA);
+
+	INSTEST(0xD9 0xE8, FLD1);
+	INSTESTMEMEQ(0xD9, 0xE8);
+
+	INSTEST(0x9B, FWAIT);
+	INSTESTMEMEQ(0x9B);
+}
+
 TEST("Assemble random SSE Instructions (2-3 arguments with many different prefixes)") {
 	char buf[10] = {0};
 	
@@ -90,9 +111,16 @@ TEST("Assemble random SSE Instructions (2-3 arguments with many different prefix
 }
 
 TEST("Stringify instructions") {
-	SUB("Stringify mov rax, rax") {
-		assertstreq(x64stringify((x64) { MOV, {rax, rax} }), "MOV	rax, rax");
-	}
+	SUB("Stringify MOV, {rax, rax} => mov rax, rax")
+		assertstreq(x64stringify((x64) { MOV, {rax, rax}, 0 }), "\tmov\trax, rax");
+
+	SUB("Stringify MOV, {rax, imm(0xABCDEF)} => mov rax, imm(0x1234567890ABCDEF)")
+		assertstreq(x64stringify((x64) { MOV, {rax, imm(0xABCDEF)}, 0 }), "\tmov\trax, 0xABCDEF");
+
+	SUB("Stringify MOV, {rax, mem($rax, 0xABCDEF, $r8, 2, $es)} => mov rax, es:[rax + r8 * 2 + 0xABCDEF]")
+		assertstreq(x64stringify((x64) { MOV, {rax, mem($rax, 0xABCDEF, $r8, 2, $es)}, 0 }), "\tmov\trax, es:[rax + 0xABCDEF + r8 * 2]");
+
+	
 }
 
 #include "tests_end.h"

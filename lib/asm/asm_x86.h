@@ -1,5 +1,13 @@
+/*
+ * asm_x86.h v1.0.0 - Aqil Contractor @AqilC 2023
+ * Licenced under Attribution-NonCommercial-ShareAlike 3.0
+ *
+ * This file includes all of the source for the "chasm" library macros and functions.
+ * WARNING: CURRENTLY NOT FULLY THREAD SAFE. Use with caution when using in thread safe code!
+ */
+
 #pragma once
-#include <hash.h>
+#include <stdbool.h>
 #include "util.h"
 
 enum x64OperandType: u64 {
@@ -12,38 +20,41 @@ enum x64OperandType: u64 {
 	
 	LABEL = 0x20,
 
-	M8 = 0x40, M16 = 0x80, M32 = 0x100, M64 = 0x200, M128 = 0x400, M256 = 0x800, M16INT = 0x1000, M32INT = 0x2000,
-	M64INT = 0x4000, M32FP = 0x8000, M64FP = 0x10000, M80FP = 0x20000, M80BCD = 0x40000, M2BYTE = 0x80000,
-	M28BYTE = 0x100000, M108BYTE = 0x200000, M512BYTE = 0x400000,
-	FARPTR1616 = 0x800000, FARPTR1632 = 0x1000000, FARPTR1664 = 0x2000000,
+	M8 = 0x40, M16 = 0x80, M32 = 0x100, M64 = 0x200, M128 = 0x400, M256 = 0x800, M512 = 0x1000,
+	M80 = 0x2000,
+	// M16INT = 0x2000, M32INT = 0x4000, M64INT = 0x8000, M32FP = 0x10000, M64FP = 0x20000,
+	// M80FP = 0x40000, M80BCD = 0x80000, M2BYTE = 0x100000, M28BYTE = 0x200000,
+	// M108BYTE = 0x400000, M512BYTE = 0x800000,
+	FARPTR1616 = 0x1000000, FARPTR1632 = 0x2000000, FARPTR1664 = 0x4000000,
 	
-	MM = 0x4000000,
+	MM = 0x8000000,
 
-	PREF66 = 0x8000000,
-	PREFREX_W = 0x10000000,
-	FAR = 0x20000000,
+	PREF66 = 0x10000000,
+	PREFREX_W = 0x20000000,
+	FAR = 0x40000000,
 
-	MOFFS8 = 0x40000000, MOFFS16 = 0x80000000, MOFFS32 = 0x100000000, MOFFS64 = 0x200000000,
+	MOFFS8 = 0x80000000, MOFFS16 = 0x100000000, MOFFS32 = 0x200000000, MOFFS64 = 0x400000000,
 
-	R8 = 0x400000000, RH = 0x800000000, AL = 0x1000000000, CL = 0x2000000000,
-	R16 = 0x4000000000, AX = 0x8000000000, DX = 0x10000000000,
-	R32 = 0x20000000000, EAX = 0x40000000000,
-	R64 = 0x80000000000, RAX = 0x100000000000,
+	R8 = 0x800000000, RH = 0x1000000000, AL = 0x2000000000, CL = 0x4000000000,
+	R16 = 0x8000000000, AX = 0x10000000000, DX = 0x20000000000,
+	R32 = 0x40000000000, EAX = 0x80000000000,
+	R64 = 0x100000000000, RAX = 0x200000000000,
 
-	REL8 = 0x200000000000,
-	REL32 = 0x400000000000,
+	REL8 = 0x400000000000,
+	REL32 = 0x800000000000,
 
-	SREG = 0x800000000000, FS = 0x1000000000000, GS = 0x2000000000000,
+	SREG = 0x1000000000000, FS = 0x2000000000000, GS = 0x4000000000000,
 
-	ST = 0x4000000000000, ST_0 = 0x8000000000000,
+	ST = 0x8000000000000, ST_0 = 0x10000000000000,
 
-	XMM = 0x10000000000000, XMM_0 = 0x20000000000000,
-	YMM = 0x40000000000000,
+	XMM = 0x20000000000000, XMM_0 = 0x40000000000000,
+	YMM = 0x80000000000000,
+	ZMM = 0x100000000000000,
 	
-	CR0_7 = 0x80000000000000, CR8 = 0x100000000000000,
-	DREG = 0x200000000000000,
+	CR0_7 = 0x200000000000000, CR8 = 0x400000000000000,
+	DREG = 0x800000000000000,
 	
-	ONE = 0x400000000000000 // EXACTLY ENOUGH TO FIT IN A 64-BIT INTEGER LETS FUCKING GO
+	ONE = 0x1000000000000000 // EXACTLY ENOUGH TO FIT IN A 64-BIT INTEGER LETS FUCKING GO
 	// 2 bytes + 2 bits for extra things that can't fit in `value`, like segment registers 😈
 };
 typedef enum x64OperandType x64OperandType;
@@ -52,7 +63,7 @@ typedef enum x64OperandType x64OperandType;
 // typedef enum x64OperandSize x64OperandSize;
 
 enum x64Op {
-	ADC = 1, ADD, ADDPD, ADDPS, ADDSD, ADDSS, ADDSUBPD, ADDSUBPS, AESDEC, AESENC, AESIMC, AND, ANDPD, ANDPS, ANDNPD, ANDNPS, BLENDPD, BLENDPS, BLENDVPD, BLENDVPS, BSF, BSR, BSWAP, BT, BTC, BTR, BTS, CALL, CBW, CWDE, CDQE, CLC, CLD, CLFLUSH, CLI, CLTS, CMC, CMOVA, CMOVAE, CMOVB, CMOVBE, CMOVC, CMOVE, CMOVG, CMOVGE, CMOVL, CMOVLE, CMOVNA, CMOVNAE, CMOVNB, CMOVNBE, CMOVNC, CMOVNE, CMOVNG, CMOVNGE, CMOVNL, CMOVNLE, CMOVNO, CMOVNP, CMOVNS, CMOVNZ, CMOVO, CMOVP, CMOVPE, CMOVPO, CMOVS, CMOVZ, CMP, CMPPD, CMPPS, CMPS, CMPSB, CMPSW, CMPSD, CMPSQ, CMPSS, CMPXCHG, CMPXCHG8B, CMPXCHG16B, COMISD, COMISS, CPUID, CRC32, CVTDQ2PD, CVTDQ2PS, CVTPD2DQ, CVTPD2PI, CVTPD2PS, CVTPI2PD, CVTPI2PS, CVTPS2DQ, CVTPS2PD, CVTPS2PI, CVTSD2SI, CVTSD2SS, CVTSI2SD, CVTSI2SS, CVTSS2SD, CVTSS2SI, CVTTPD2DQ, CVTTPD2PI, CVTTPS2DQ, CVTTPS2PI, CVTTSD2SI, CVTTSS2SI, CWD, CDQ, CQO, DEC, DIV, DIVPD, DIVPS, DIVSD, DIVSS, DPPD, DPPS, EMMS, ENTER, EXTRACTPS, F2XM1, FABS, FADD, FADDP, FIADD, FBLD, FCHS, FCLEX, FNCLEX, FCOM, FCOMP, FCOMPP, FCOS, FDIV, FDIVP, FIDIV, FDIVR, FDIVRP, FIDIVR, FICOM, FICOMP, FILD, FINIT, FNINIT, FLD, FLD1, FLDL2T, FLDL2E, FLDPI, FLDLG2, FLDLN2, FLDZ, FLDCW, FLDENV, FMUL, FMULP, FIMUL, FNOP, FPATAN, FPREM, FPREM1, FPTAN, FRNDINT, FSAVE, FNSAVE, FSCALE, FSIN, FSINCOS, FSQRT, FSUB, FSUBP, FISUB, FSUBR, FSUBRP, FISUBR, FUCOM, FUCOMP, FUCOMPP, FXAM, FXCH, FXSAVE, FXSAVE64, FXTRACT, FYL2X, FYL2XP1, HADDPD, HADDPS, HLT, HSUBPD, HSUBPS, IDIV, IMUL, IN, INC, INS, INSB, INSW, INSD, INSERTPS, INT3, INT1, INT, INVD, INVLPG, INVPCID, IRET, IRETD, IRETQ, JA, JAE, JB, JBE, JC, JECXZ, JRCXZ, JE, JG, JGE, JL, JLE, JNA, JNAE, JNB, JNBE, JNC, JNE, JNG, JNGE, JNL, JNLE, JNO, JNP, JNS, JNZ, JO, JP, JPE, JPO, JS, JZ, JMP, LAHF, LAR, LDDQU, LDMXCSR, LSS, LFS, LGS, LEA, LEAVE, LFENCE, LGDT, LIDT, LLDT, LMSW, LOCK, LODS, LODSB, LODSW, LODSD, LODSQ, LOOP, LOOPE, LOOPNE, LSL, LTR, LZCNT, MASKMOVDQU, MASKMOVQ, MAXPD, MAXPS, MAXSD, MAXSS, MFENCE, MINPD, MINPS, MINSD, MINSS, MONITOR, MOV, MOVAPD, MOVAPS, MOVBE, MOVD, MOVQ, MOVDDUP, MOVDQA, MOVDQU, MOVDQ2Q, MOVHLPS, MOVHPD, MOVHPS, MOVLHPS, MOVLPD, MOVLPS, MOVMSKPD, MOVMSKPS, MOVNTDQA, MOVNTDQ, MOVNTI, MOVNTPD, MOVNTPS, MOVNTQ, MOVQ2DQ, MOVS, MOVSB, MOVSW, MOVSD, MOVSQ, MOVSHDUP, MOVSLDUP, MOVSS, MOVSX, MOVSXD, MOVUPD, MOVUPS, MOVZX, MPSADBW, MUL, MULPD, MULPS, MULSD, MULSS, MWAIT, NEG, NOP, NOT, OR, ORPD, ORPS, OUT, OUTS, OUTSB, OUTSW, OUTSD, PABSB, PABSW, PABSD, PACKSSWB, PACKSSDW, PACKUSDW, PACKUSWB, PADDB, PADDW, PADDD, PADDQ, PADDSB, PADDSW, PADDUSB, PADDUSW, PALIGNR, PAND, PANDN, PAUSE, PAVGB, PAVGW, PBLENDVB, PBLENDW, PCLMULQDQ, PCMPEQB, PCMPEQW, PCMPEQD, PCMPEQQ, PCMPGTB, PCMPGTW, PCMPGTD, PCMPGTQ, PEXTRB, PEXTRD, PEXTRQ, PEXTRW, PHADDW, PHADDD, PHADDSW, PHMINPOSUW, PHSUBW, PHSUBD, PHSUBSW, PINSRB, PINSRD, PINSRW, PMADDUBSW, PMADDWD, PMAXSB, PMAXSD, PMAXSW, PMAXUB, PMAXUD, PMAXUW, PMINSB, PMINSD, PMINSW, PMINUB, PMINUD, PMINUW, PMOVMSKB, PMOVSXBW, PMOVSXBD, PMOVSXBQ, PMOVSXWD, PMOVSXWQ, PMOVSXDQ, PMOVZXBW, PMOVZXBD, PMOVZXBQ, PMOVZXWD, PMOVZXWQ, PMOVZXDQ, PMULDQ, PMULHRSW, PMULHUW, PMULHW, PMULLD, PMULLW, PMULUDQ, POP, POPCNT, POPF, POPFQ, POR, PREFETCHT0, PREFETCHT1, PREFETCHT2, PREFETCHNTA, PSADBW, PSHUFB, PSHUFD, PSHUFHW, PSHUFLW, PSHUFW, PSIGNB, PSIGNW, PSIGND, PSLLDQ, PSLLW, PSLLD, PSLLQ, PSRAW, PSRAD, PSRLDQ, PSRLW, PSRLD, PSRLQ, PSUBB, PSUBW, PSUBD, PSUBQ, PSUBSB, PSUBSW, PSUBUSB, PSUBUSW, PUNPCKHBW, PUNPCKHWD, PUNPCKHDQ, PUNPCKHQDQ, PUNPCKLBW, PUNPCKLWD, PUNPCKLDQ, PUNPCKLQDQ, PUSH, PUSHQ, PUSHW, PUSHF, PUSHFQ, PXOR, RCL, RCR, ROL, ROR, RCPPS, RCPSS, RDFSBASE, RDGSBASE, RDMSR, RDPMC, RDRAND, RDTSC, RDTSCP, REP_INS, REP_MOVS, REP_OUTS, REP_LODS, REPE_CMPS, REPE_SCAS, REPNE_CMPS, REPNE_SCAS, RET, ROUNDPD, ROUNDPS, ROUNDSD, ROUNDSS, RSQRTPS, RSQRTSS, SAHF, SAL, SAR, SHL, SHR, SBB, SCAS, SCASB, SCASW, SCASD, SCASQ, SETA, SETAE, SETB, SETBE, SETC, SETE, SETG, SETGE, SETL, SETLE, SETNA, SETNAE, SETNB, SETNBE, SETNC, SETNE, SETNG, SETNGE, SETNL, SETNLE, SETNO, SETNP, SETNS, SETNZ, SETO, SETP, SETPE, SETPO, SETS, SETZ, SFENCE, SGDT, SHLD, SHRD, SHUFPD, SHUFPS, SIDT, SLDT, SMSW, SQRTPD, SQRTPS, SQRTSD, SQRTSS, SUB, SUBPD, SUBPS, SUBSD, SUBSS, SWAPGS, SYSCALL, SYSENTER, SYSEXIT, SYSRET, TZCNT, UCOMISD, UCOMISS, UD2, UNPCKHPD, UNPCKHPS, UNPCKLPD, UNPCKLPS, VERR, VERW, WAIT, FWAIT, WBINVD, WRFSBASE, WRGSBASE, WRMSR, XACQUIRE, XRELEASE, XABORT, XADD, XBEGIN, XCHG, XEND, XGETBV, XLAT, XLATB, XOR, XORPD, XORPS, XSAVE, XSAVE64, XSAVEOPT, XSAVEOPT64, XSETBV, LABEL_DEF
+	ADC = 1, ADD, ADDPD, ADDPS, ADDSD, ADDSS, ADDSUBPD, ADDSUBPS, AESDEC, AESDECLAST, AESENC, AESENCLAST, AESIMC, AESKEYGENASSIST, AND, ANDPD, ANDPS, ANDNPD, ANDNPS, BLENDPD, BLENDPS, BLENDVPD, BLENDVPS, BSF, BSR, BSWAP, BT, BTC, BTR, BTS, CALL, CBW, CWDE, CDQE, CLC, CLD, CLFLUSH, CLI, CLTS, CMC, CMOVA, CMOVAE, CMOVB, CMOVBE, CMOVC, CMOVE, CMOVG, CMOVGE, CMOVL, CMOVLE, CMOVNA, CMOVNAE, CMOVNB, CMOVNBE, CMOVNC, CMOVNE, CMOVNG, CMOVNGE, CMOVNL, CMOVNLE, CMOVNO, CMOVNP, CMOVNS, CMOVNZ, CMOVO, CMOVP, CMOVPE, CMOVPO, CMOVS, CMOVZ, CMP, CMPPD, CMPPS, CMPS, CMPSB, CMPSW, CMPSD, CMPSQ, CMPSS, CMPXCHG, CMPXCHG8B, CMPXCHG16B, COMISD, COMISS, CPUID, CRC32, CVTDQ2PD, CVTDQ2PS, CVTPD2DQ, CVTPD2PI, CVTPD2PS, CVTPI2PD, CVTPI2PS, CVTPS2DQ, CVTPS2PD, CVTPS2PI, CVTSD2SI, CVTSD2SS, CVTSI2SD, CVTSI2SS, CVTSS2SD, CVTSS2SI, CVTTPD2DQ, CVTTPD2PI, CVTTPS2DQ, CVTTPS2PI, CVTTSD2SI, CVTTSS2SI, CWD, CDQ, CQO, DEC, DIV, DIVPD, DIVPS, DIVSD, DIVSS, DPPD, DPPS, EMMS, ENTER, EXTRACTPS, F2XM1, FABS, FADD, FADDP, FIADD, FBLD, FBSTP, FCHS, FCLEX, FNCLEX, FCMOVB, FCMOVE, FCMOVBE, FCMOVU, FCMOVNB, FCMOVNE, FCMOVNBE, FCMOVNU, FCOM, FCOMP, FCOMPP, FCOMI, FCOMIP, FUCOMI, FUCOMIP, FCOS, FDECSTP, FDIV, FDIVP, FIDIV, FDIVR, FDIVRP, FIDIVR, FFREE, FICOM, FICOMP, FILD, FINCSTP, FINIT, FNINIT, FIST, FISTP, FISTTP, FLD, FLD1, FLDL2T, FLDL2E, FLDPI, FLDLG2, FLDLN2, FLDZ, FLDCW, FLDENV, FMUL, FMULP, FIMUL, FNOP, FPATAN, FPREM, FPREM1, FPTAN, FRNDINT, FRSTOR, FSAVE, FNSAVE, FSCALE, FSIN, FSINCOS, FSQRT, FST, FSTP, FSTCW, FNSTCW, FSTENV, FNSTENV, FSTSW, FNSTSW, FSUB, FSUBP, FISUB, FSUBR, FSUBRP, FISUBR, FTST, FUCOM, FUCOMP, FUCOMPP, FXAM, FXCH, FXRSTOR, FXRSTOR64, FXSAVE, FXSAVE64, FXTRACT, FYL2X, FYL2XP1, HADDPD, HADDPS, HLT, HSUBPD, HSUBPS, IDIV, IMUL, IN, INC, INS, INSB, INSW, INSD, INSERTPS, INT3, INT1, INT, INVD, INVLPG, INVPCID, IRET, IRETD, IRETQ, JA, JAE, JB, JBE, JC, JECXZ, JRCXZ, JE, JG, JGE, JL, JLE, JNA, JNAE, JNB, JNBE, JNC, JNE, JNG, JNGE, JNL, JNLE, JNO, JNP, JNS, JNZ, JO, JP, JPE, JPO, JS, JZ, JMP, LAHF, LAR, LDDQU, LDMXCSR, LSS, LFS, LGS, LEA, LEAVE, LFENCE, LGDT, LIDT, LLDT, LMSW, LOCK, LODS, LODSB, LODSW, LODSD, LODSQ, LOOP, LOOPE, LOOPNE, LSL, LTR, LZCNT, MASKMOVDQU, MASKMOVQ, MAXPD, MAXPS, MAXSD, MAXSS, MFENCE, MINPD, MINPS, MINSD, MINSS, MONITOR, MOV, MOVAPD, MOVAPS, MOVBE, MOVD, MOVQ, MOVDDUP, MOVDQA, MOVDQU, MOVDQ2Q, MOVHLPS, MOVHPD, MOVHPS, MOVLHPS, MOVLPD, MOVLPS, MOVMSKPD, MOVMSKPS, MOVNTDQA, MOVNTDQ, MOVNTI, MOVNTPD, MOVNTPS, MOVNTQ, MOVQ2DQ, MOVS, MOVSB, MOVSW, MOVSD, MOVSQ, MOVSHDUP, MOVSLDUP, MOVSS, MOVSX, MOVSXD, MOVUPD, MOVUPS, MOVZX, MPSADBW, MUL, MULPD, MULPS, MULSD, MULSS, MWAIT, NEG, NOP, NOT, OR, ORPD, ORPS, OUT, OUTS, OUTSB, OUTSW, OUTSD, PABSB, PABSW, PABSD, PACKSSWB, PACKSSDW, PACKUSDW, PACKUSWB, PADDB, PADDW, PADDD, PADDQ, PADDSB, PADDSW, PADDUSB, PADDUSW, PALIGNR, PAND, PANDN, PAUSE, PAVGB, PAVGW, PBLENDVB, PBLENDW, PCLMULQDQ, PCMPEQB, PCMPEQW, PCMPEQD, PCMPEQQ, PCMPESTRI, PCMPESTRM, PCMPGTB, PCMPGTW, PCMPGTD, PCMPGTQ, PCMPISTRI, PCMPISTRM, PEXTRB, PEXTRD, PEXTRQ, PEXTRW, PHADDW, PHADDD, PHADDSW, PHMINPOSUW, PHSUBW, PHSUBD, PHSUBSW, PINSRB, PINSRD, PINSRW, PMADDUBSW, PMADDWD, PMAXSB, PMAXSD, PMAXSW, PMAXUB, PMAXUD, PMAXUW, PMINSB, PMINSD, PMINSW, PMINUB, PMINUD, PMINUW, PMOVMSKB, PMOVSXBW, PMOVSXBD, PMOVSXBQ, PMOVSXWD, PMOVSXWQ, PMOVSXDQ, PMOVZXBW, PMOVZXBD, PMOVZXBQ, PMOVZXWD, PMOVZXWQ, PMOVZXDQ, PMULDQ, PMULHRSW, PMULHUW, PMULHW, PMULLD, PMULLW, PMULUDQ, POP, POPCNT, POPF, POPFQ, POR, PREFETCHT0, PREFETCHT1, PREFETCHT2, PREFETCHNTA, PSADBW, PSHUFB, PSHUFD, PSHUFHW, PSHUFLW, PSHUFW, PSIGNB, PSIGNW, PSIGND, PSLLDQ, PSLLW, PSLLD, PSLLQ, PSRAW, PSRAD, PSRLDQ, PSRLW, PSRLD, PSRLQ, PSUBB, PSUBW, PSUBD, PSUBQ, PSUBSB, PSUBSW, PSUBUSB, PSUBUSW, PTEST, PUNPCKHBW, PUNPCKHWD, PUNPCKHDQ, PUNPCKHQDQ, PUNPCKLBW, PUNPCKLWD, PUNPCKLDQ, PUNPCKLQDQ, PUSH, PUSHQ, PUSHW, PUSHF, PUSHFQ, PXOR, RCL, RCR, ROL, ROR, RCPPS, RCPSS, RDFSBASE, RDGSBASE, RDMSR, RDPMC, RDRAND, RDTSC, RDTSCP, REP_INS, REP_MOVS, REP_OUTS, REP_LODS, REP_STOS, REPE_CMPS, REPE_SCAS, REPNE_CMPS, REPNE_SCAS, RET, ROUNDPD, ROUNDPS, ROUNDSD, ROUNDSS, RSQRTPS, RSQRTSS, SAHF, SAL, SAR, SHL, SHR, SBB, SCAS, SCASB, SCASW, SCASD, SCASQ, SETA, SETAE, SETB, SETBE, SETC, SETE, SETG, SETGE, SETL, SETLE, SETNA, SETNAE, SETNB, SETNBE, SETNC, SETNE, SETNG, SETNGE, SETNL, SETNLE, SETNO, SETNP, SETNS, SETNZ, SETO, SETP, SETPE, SETPO, SETS, SETZ, SFENCE, SGDT, SHLD, SHRD, SHUFPD, SHUFPS, SIDT, SLDT, SMSW, SQRTPD, SQRTPS, SQRTSD, SQRTSS, STC, STD, STI, STMXCSR, STOS, STOSB, STOSW, STOSD, STOSQ, STR, SUB, SUBPD, SUBPS, SUBSD, SUBSS, SWAPGS, SYSCALL, SYSENTER, SYSEXIT, SYSRET, TEST, TZCNT, UCOMISD, UCOMISS, UD2, UNPCKHPD, UNPCKHPS, UNPCKLPD, UNPCKLPS, VERR, VERW, WAIT, FWAIT, WBINVD, WRFSBASE, WRGSBASE, WRMSR, XACQUIRE, XRELEASE, XABORT, XADD, XBEGIN, XCHG, XEND, XGETBV, XLAT, XLATB, XOR, XORPD, XORPS, XRSTOR, XRSTOR64, XSAVE, XSAVE64, XSAVEOPT, XSAVEOPT64, XSETBV, XTEST, LABEL_DEF
 };
 typedef enum x64Op x64Op;
 
@@ -65,7 +76,7 @@ typedef struct x64PrefGroup x64PrefGroup;
 union x64Operand {
 	struct {
 		x64OperandType type;
-		u64 value;
+		i64 value;
 	};
 };
 typedef union x64Operand x64Operand;
@@ -86,6 +97,7 @@ struct x64LookupGeneralIns {
 		char* desc;
 		u8 mem_operand; // Index of memory operand if there is one + 1
 		u8 reg_operand; // Index of register operand if there is one + 1
+		bool vexxopevex;
 		u16 prefixes;
 		u8 preflen;
 		bool pref66;
@@ -681,6 +693,19 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Perform one round of an AES decryption flow, using the Equivalent Inverse Cipher, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
 		.opcode = { 0x0F, 0x38, 0xDE }, .oplen = 3,
 	} } },
+	{ "aesdeclast", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESDECLAST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 DF /r",
+		.desc = "Perform the last round of an AES decryption flow, using the Equivalent Inverse Cipher, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
+		.opcode = { 0x0F, 0x38, 0xDF }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESDECLAST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 DF /r",
+		.desc = "Perform the last round of an AES decryption flow, using the Equivalent Inverse Cipher, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
+		.opcode = { 0x0F, 0x38, 0xDF }, .oplen = 3,
+	} } },
 	{ "aesenc", 2, (struct x64LookupActualIns[]) { {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
 		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
@@ -694,6 +719,19 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Perform one round of an AES encryption flow, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
 		.opcode = { 0x0F, 0x38, 0xDC }, .oplen = 3,
 	} } },
+	{ "aesenclast", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESENCLAST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 DD /r",
+		.desc = "Perform the last round of an AES encryption flow, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
+		.opcode = { 0x0F, 0x38, 0xDD }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESENCLAST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 DD /r",
+		.desc = "Perform the last round of an AES encryption flow, operating on a 128-bit data (state) from xmm1 with a 128-bit round key from xmm2/m128.",
+		.opcode = { 0x0F, 0x38, 0xDD }, .oplen = 3,
+	} } },
 	{ "aesimc", 2, (struct x64LookupActualIns[]) { {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
 		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
@@ -706,6 +744,19 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "AESIMC xmm1, xmm2/m128", .orig_opcode = "66 0F 38 DB /r",
 		.desc = "Perform the InvMixColumn transformation on a 128-bit round key from xmm2/m128 and store the result in xmm1.",
 		.opcode = { 0x0F, 0x38, 0xDB }, .oplen = 3,
+	} } },
+	{ "aeskeygenassist", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESKEYGENASSIST xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A DF /r ib",
+		.desc = "Assist in AES round key generation using an 8 bits Round Constant (RCON) specified in the immediate byte, operating on 128 bits of data specified in xmm2/m128 and stores the result in xmm1.",
+		.opcode = { 0x0F, 0x3A, 0xDF }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "AESKEYGENASSIST xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A DF /r ib",
+		.desc = "Assist in AES round key generation using an 8 bits Round Constant (RCON) specified in the immediate byte, operating on 128 bits of data specified in xmm2/m128 and stores the result in xmm1.",
+		.opcode = { 0x0F, 0x3A, 0xDF }, .oplen = 3,
 	} } },
 	{ "and", 38, (struct x64LookupActualIns[]) { {
 		.args = { AL, IMM8 }, .arglen = 2, .immediate = 2,
@@ -1415,7 +1466,7 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Store selected bit in CF flag and set.",
 		.opcode = { 0x0F, 0xBA }, .oplen = 2,
 	} } },
-	{ "call", 6, (struct x64LookupActualIns[]) { {
+	{ "call", 5, (struct x64LookupActualIns[]) { {
 		.args = { REL32 }, .arglen = 1,
 		.orig_ins = "CALL rel32", .orig_opcode = "E8 cd",
 		.desc = "Call near, relative, displacement relative to next instruction. 32-bit displacement sign extended to 64-bits in 64-bit mode.",
@@ -1434,19 +1485,13 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0xFF }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { FARPTR1616 }, .arglen = 1, .mem_operand = 1,
-		.orig_ins = "CALL m16:16", .orig_opcode = "FF /3",
-		.desc = "Call far, absolute indirect address given in m16:16. In 32-bit mode: if selector points to a gate, then RIP = 32-bit zero extended displacement taken from gate; else RIP = zero extended 16- bit offset from far pointer referenced in the instruction.",
-		.opcode = { 0xFF }, .oplen = 1,
-	}, {
-		.modrmreq = true, .modrm = 0x18, 
-		.args = { FARPTR1632 }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "CALL m16:32", .orig_opcode = "FF /3",
 		.desc = "In 64-bit mode: If selector points to a gate, then RIP = 64-bit displacement taken from gate; else RIP = zero extended 32-bit offset from far pointer referenced in the instruction.",
 		.opcode = { 0xFF }, .oplen = 1,
 	}, {
 		.rex = 0x48, .modrmreq = true, .modrm = 0x18, 
-		.args = { FARPTR1664 }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "CALL m16:64", .orig_opcode = "REX.W+ FF /3",
 		.desc = "In 64-bit mode: If selector points to a gate, then RIP = 64-bit displacement taken from gate; else RIP = 64-bit offset from far pointer referenced in the instruction.",
 		.opcode = { 0xFF }, .oplen = 1,
@@ -2883,8 +2928,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "CMPS m8, m8", .orig_opcode = "A6",
 		.desc = "For legacy mode, compare byte at address DS:(E)SI with byte at address ES:(E)DI; For 64-bit mode compare byte at address (R|E)SI to byte at address (R|E)DI. The status flags are set accordingly.",
 		.opcode = { 0xA6 }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, M16 }, .arglen = 2,
+	}, {
+		.args = { M128, M128 }, .arglen = 2,
 		.orig_ins = "CMPS m16, m16", .orig_opcode = "A7",
 		.desc = "For legacy mode, compare word at address DS:(E)SI with word at address ES:(E)DI; For 64-bit mode compare word at address (R|E)SI with word at address (R|E)DI. The status flags are set accordingly.",
 		.opcode = { 0xA7 }, .oplen = 1,
@@ -3701,42 +3746,64 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Replace ST with its absolute value.",
 		.opcode = { 0xD9, 0xE1 }, .oplen = 2,
 	} } },
-	{ "fadd", 2, (struct x64LookupActualIns[]) { {
+	{ "fadd", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FADD m32fp", .orig_opcode = "D8 /0",
 		.desc = "Add m32fp to ST(0) and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FADD m64fp", .orig_opcode = "DC /0",
 		.desc = "Add m64fp to ST(0) and store result in ST(0).",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FADD ST(0), ST(i)", .orig_opcode = "D8 C0 +i",
+		.desc = "Add ST(0) to ST(i) and store result in ST(0).",
+		.opcode = { 0xD8, 0xC0 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FADD ST(i), ST(0)", .orig_opcode = "DC C0 +i",
+		.desc = "Add ST(i) to ST(0) and store result in ST(i).",
+		.opcode = { 0xDC, 0xC0 }, .oplen = 2,
 	} } },
-	{ "faddp", 1, (struct x64LookupActualIns[]) { {
+	{ "faddp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FADDP ST(i), ST(0)", .orig_opcode = "DE C0 +i",
+		.desc = "Add ST(0) to ST(i), store result in ST(i), and pop the register stack.",
+		.opcode = { 0xDE, 0xC0 }, .oplen = 2,
+	}, {
 		.orig_ins = "FADDP", .orig_opcode = "DE C1",
 		.desc = "Add ST(0) to ST(1), store result in ST(1), and pop the register stack.",
 		.opcode = { 0xDE, 0xC1 }, .oplen = 2,
 	} } },
 	{ "fiadd", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIADD m32int", .orig_opcode = "DA /0",
 		.desc = "Add m32int to ST(0) and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIADD m16int", .orig_opcode = "DE /0",
 		.desc = "Add m16int to ST(0) and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
 	} } },
 	{ "fbld", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M80BCD }, .arglen = 1, .mem_operand = 1,
+		.args = { M80 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FBLD m80bcd", .orig_opcode = "DF /4",
 		.desc = "Convert BCD value to floating-point and push onto the FPU stack.",
+		.opcode = { 0xDF }, .oplen = 1,
+	} } },
+	{ "fbstp", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x30, 
+		.args = { M80 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FBSTP m80bcd", .orig_opcode = "DF /6",
+		.desc = "Store ST(0) in m80bcd and pop ST(0).",
 		.opcode = { 0xDF }, .oplen = 1,
 	} } },
 	{ "fchs", 1, (struct x64LookupActualIns[]) { {
@@ -3754,35 +3821,93 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Clear floating-point exception flags without checking for pending unmasked floating-point exceptions.",
 		.opcode = { 0xDB, 0xE2 }, .oplen = 2,
 	} } },
-	{ "fcom", 3, (struct x64LookupActualIns[]) { {
+	{ "fcmovb", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVB ST(0), ST(i)", .orig_opcode = "DA C0 +i",
+		.desc = "Move if below (CF=1).",
+		.opcode = { 0xDA, 0xC0 }, .oplen = 2,
+	} } },
+	{ "fcmove", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVE ST(0), ST(i)", .orig_opcode = "DA C8 +i",
+		.desc = "Move if equal (ZF=1).",
+		.opcode = { 0xDA, 0xC8 }, .oplen = 2,
+	} } },
+	{ "fcmovbe", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVBE ST(0), ST(i)", .orig_opcode = "DA D0 +i",
+		.desc = "Move if below or equal (CF=1 or ZF=1).",
+		.opcode = { 0xDA, 0xD0 }, .oplen = 2,
+	} } },
+	{ "fcmovu", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVU ST(0), ST(i)", .orig_opcode = "DA D8 +i",
+		.desc = "Move if unordered (PF=1).",
+		.opcode = { 0xDA, 0xD8 }, .oplen = 2,
+	} } },
+	{ "fcmovnb", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVNB ST(0), ST(i)", .orig_opcode = "DB C0 +i",
+		.desc = "Move if not below (CF=0).",
+		.opcode = { 0xDB, 0xC0 }, .oplen = 2,
+	} } },
+	{ "fcmovne", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVNE ST(0), ST(i)", .orig_opcode = "DB C8 +i",
+		.desc = "Move if not equal (ZF=0).",
+		.opcode = { 0xDB, 0xC8 }, .oplen = 2,
+	} } },
+	{ "fcmovnbe", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVNBE ST(0), ST(i)", .orig_opcode = "DB D0 +i",
+		.desc = "Move if not below or equal (CF=0 and ZF=0).",
+		.opcode = { 0xDB, 0xD0 }, .oplen = 2,
+	} } },
+	{ "fcmovnu", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCMOVNU ST(0), ST(i)", .orig_opcode = "DB D8 +i",
+		.desc = "Move if not unordered (PF=0).",
+		.opcode = { 0xDB, 0xD8 }, .oplen = 2,
+	} } },
+	{ "fcom", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x10, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FCOM m32fp", .orig_opcode = "D8 /2",
 		.desc = "Compare ST(0) with m32fp.",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x10, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FCOM m64fp", .orig_opcode = "DC /2",
 		.desc = "Compare ST(0) with m64fp.",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FCOM ST(i)", .orig_opcode = "D8 D0 +i",
+		.desc = "Compare ST(0) with ST(i).",
+		.opcode = { 0xD8, 0xD0 }, .oplen = 2,
 	}, {
 		.orig_ins = "FCOM", .orig_opcode = "D8 D1",
 		.desc = "Compare ST(0) with ST(1).",
 		.opcode = { 0xD8, 0xD1 }, .oplen = 2,
 	} } },
-	{ "fcomp", 3, (struct x64LookupActualIns[]) { {
+	{ "fcomp", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FCOMP m32fp", .orig_opcode = "D8 /3",
 		.desc = "Compare ST(0) with m32fp and pop register stack.",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FCOMP m64fp", .orig_opcode = "DC /3",
 		.desc = "Compare ST(0) with m64fp and pop register stack.",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FCOMP ST(i)", .orig_opcode = "D8 D8 +i",
+		.desc = "Compare ST(0) with ST(i) and pop register stack.",
+		.opcode = { 0xD8, 0xD8 }, .oplen = 2,
 	}, {
 		.orig_ins = "FCOMP", .orig_opcode = "D8 D9",
 		.desc = "Compare ST(0) with ST(1) and pop register stack.",
@@ -3793,117 +3918,187 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Compare ST(0) with ST(1) and pop register stack twice.",
 		.opcode = { 0xDE, 0xD9 }, .oplen = 2,
 	} } },
+	{ "fcomi", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCOMI ST, ST(i)", .orig_opcode = "DB F0 +i",
+		.desc = "Compare ST(0) with ST(i) and set status flags accordingly.",
+		.opcode = { 0xDB, 0xF0 }, .oplen = 2,
+	} } },
+	{ "fcomip", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FCOMIP ST, ST(i)", .orig_opcode = "DF F0 +i",
+		.desc = "Compare ST(0) with ST(i), set status flags accordingly, and pop register stack.",
+		.opcode = { 0xDF, 0xF0 }, .oplen = 2,
+	} } },
+	{ "fucomi", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FUCOMI ST, ST(i)", .orig_opcode = "DB E8 +i",
+		.desc = "Compare ST(0) with ST(i), check for ordered values, and set status flags accordingly.",
+		.opcode = { 0xDB, 0xE8 }, .oplen = 2,
+	} } },
+	{ "fucomip", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FUCOMIP ST, ST(i)", .orig_opcode = "DF E8 +i",
+		.desc = "Compare ST(0) with ST(i), check for ordered values, set status flags accordingly, and pop register stack.",
+		.opcode = { 0xDF, 0xE8 }, .oplen = 2,
+	} } },
 	{ "fcos", 1, (struct x64LookupActualIns[]) { {
 		.orig_ins = "FCOS", .orig_opcode = "D9 FF",
 		.desc = "Replace ST(0) with its cosine.",
 		.opcode = { 0xD9, 0xFF }, .oplen = 2,
 	} } },
-	{ "fdiv", 2, (struct x64LookupActualIns[]) { {
+	{ "fdecstp", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "FDECSTP", .orig_opcode = "D9 F6",
+		.desc = "Decrement TOP field in FPU status word.",
+		.opcode = { 0xD9, 0xF6 }, .oplen = 2,
+	} } },
+	{ "fdiv", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FDIV m32fp", .orig_opcode = "D8 /6",
 		.desc = "Divide ST(0) by m32fp and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FDIV m64fp", .orig_opcode = "DC /6",
 		.desc = "Compare ST(0) with ST(i), set status flags accordingly, and pop register stack.",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FDIV ST(0), ST(i)", .orig_opcode = "D8 F0 +i",
+		.desc = "Divide ST(0) by ST(i) and store result in ST(0).",
+		.opcode = { 0xD8, 0xF0 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FDIV ST(i), ST(0)", .orig_opcode = "DC F0 +i",
+		.desc = "Divide ST(i) by ST(0) and store result in ST(i).",
+		.opcode = { 0xDC, 0xF0 }, .oplen = 2,
 	} } },
-	{ "fdivp", 1, (struct x64LookupActualIns[]) { {
+	{ "fdivp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FDIVP ST(i), ST(0)", .orig_opcode = "DE F0 +i",
+		.desc = "Divide ST(i) by ST(0), store result in ST(i), and pop the register stack.",
+		.opcode = { 0xDE, 0xF0 }, .oplen = 2,
+	}, {
 		.orig_ins = "FDIVP", .orig_opcode = "DE F1",
 		.desc = "Divide ST(1) by ST(0), store result in ST(1), and pop the register stack.",
 		.opcode = { 0xDE, 0xF1 }, .oplen = 2,
 	} } },
 	{ "fidiv", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIDIV m32int", .orig_opcode = "DA /6",
 		.desc = "Divide ST(0) by m32int and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIDIV m16int", .orig_opcode = "DE /6",
 		.desc = "Divide ST(0) by m64int and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
 	} } },
-	{ "fdivr", 2, (struct x64LookupActualIns[]) { {
+	{ "fdivr", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x38, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FDIVR m32fp", .orig_opcode = "D8 /7",
 		.desc = "Divide m32fp by ST(0) and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x38, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FDIVR m64fp", .orig_opcode = "DC /7",
 		.desc = "Divide m64fp by ST(0) and store result in ST(0).",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FDIVR ST(0), ST(i)", .orig_opcode = "D8 F8 +i",
+		.desc = "Divide ST(i) by ST(0) and store result in ST(0).",
+		.opcode = { 0xD8, 0xF8 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FDIVR ST(i), ST(0)", .orig_opcode = "DC F8 +i",
+		.desc = "Divide ST(0) by ST(i) and store result in ST(i).",
+		.opcode = { 0xDC, 0xF8 }, .oplen = 2,
 	} } },
-	{ "fdivrp", 1, (struct x64LookupActualIns[]) { {
+	{ "fdivrp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FDIVRP ST(i), ST(0)", .orig_opcode = "DE F8 +i",
+		.desc = "Divide ST(0) by ST(i), store result in ST(i), and pop the register stack.",
+		.opcode = { 0xDE, 0xF8 }, .oplen = 2,
+	}, {
 		.orig_ins = "FDIVRP", .orig_opcode = "DE F9",
 		.desc = "Divide ST(0) by ST(1), store result in ST(1), and pop the register stack.",
 		.opcode = { 0xDE, 0xF9 }, .oplen = 2,
 	} } },
 	{ "fidivr", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x38, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIDIVR m32int", .orig_opcode = "DA /7",
 		.desc = "Divide m32int by ST(0) and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x38, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIDIVR m16int", .orig_opcode = "DE /7",
 		.desc = "Divide m16int by ST(0) and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
 	} } },
+	{ "ffree", 1, (struct x64LookupActualIns[]) { {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FFREE ST(i)", .orig_opcode = "DD C0 +i",
+		.desc = "Sets tag for ST(i) to empty.",
+		.opcode = { 0xDD, 0xC0 }, .oplen = 2,
+	} } },
 	{ "ficom", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x10, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FICOM m16int", .orig_opcode = "DE /2",
 		.desc = "Compare ST(0) with m16int.",
 		.opcode = { 0xDE }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x10, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FICOM m32int", .orig_opcode = "DA /2",
 		.desc = "Compare ST(0) with m32int.",
 		.opcode = { 0xDA }, .oplen = 1,
 	} } },
 	{ "ficomp", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FICOMP m16int", .orig_opcode = "DE /3",
 		.desc = "Compare ST(0) with m16int and pop stack register.",
 		.opcode = { 0xDE }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FICOMP m32int", .orig_opcode = "DA /3",
 		.desc = "Compare ST(0) with m32int and pop stack register.",
 		.opcode = { 0xDA }, .oplen = 1,
 	} } },
 	{ "fild", 3, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FILD m16int", .orig_opcode = "DF /0",
 		.desc = "Push m16int onto the FPU register stack.",
 		.opcode = { 0xDF }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FILD m32int", .orig_opcode = "DB /0",
 		.desc = "Push m32int onto the FPU register stack.",
 		.opcode = { 0xDB }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M64INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FILD m64int", .orig_opcode = "DF /5",
 		.desc = "Push m64int onto the FPU register stack.",
 		.opcode = { 0xDF }, .oplen = 1,
+	} } },
+	{ "fincstp", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "FINCSTP", .orig_opcode = "D9 F7",
+		.desc = "Increment the TOP field in the FPU status register.",
+		.opcode = { 0xD9, 0xF7 }, .oplen = 2,
 	} } },
 	{ "finit", 1, (struct x64LookupActualIns[]) { {
 		.orig_ins = "FINIT", .orig_opcode = "9B DB E3",
@@ -3915,24 +4110,80 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Initialize FPU without checking for pending unmasked floating-point exceptions.",
 		.opcode = { 0xDB, 0xE3 }, .oplen = 2,
 	} } },
-	{ "fld", 3, (struct x64LookupActualIns[]) { {
+	{ "fist", 2, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x10, 
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FIST m16int", .orig_opcode = "DF /2",
+		.desc = "Store ST(0) in m16int.",
+		.opcode = { 0xDF }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x10, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FIST m32int", .orig_opcode = "DB /2",
+		.desc = "Store ST(0) in m32int.",
+		.opcode = { 0xDB }, .oplen = 1,
+	} } },
+	{ "fistp", 3, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x18, 
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTP m16int", .orig_opcode = "DF /3",
+		.desc = "Store ST(0) in m16int and pop register stack.",
+		.opcode = { 0xDF }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x18, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTP m32int", .orig_opcode = "DB /3",
+		.desc = "Store ST(0) in m32int and pop register stack.",
+		.opcode = { 0xDB }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTP m64int", .orig_opcode = "DF /7",
+		.desc = "Store ST(0) in m64int and pop register stack.",
+		.opcode = { 0xDF }, .oplen = 1,
+	} } },
+	{ "fisttp", 3, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x8, 
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTTP m16int", .orig_opcode = "DF /1",
+		.desc = "Store ST(0) in m16int with truncation.",
+		.opcode = { 0xDF }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x8, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTTP m32int", .orig_opcode = "DB /1",
+		.desc = "Store ST(0) in m32int with truncation.",
+		.opcode = { 0xDB }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x8, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FISTTP m64int", .orig_opcode = "DD /1",
+		.desc = "Store ST(0) in m64int with truncation.",
+		.opcode = { 0xDD }, .oplen = 1,
+	} } },
+	{ "fld", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FLD m32fp", .orig_opcode = "D9 /0",
 		.desc = "Push m32fp onto the FPU register stack.",
 		.opcode = { 0xD9 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FLD m64fp", .orig_opcode = "DD /0",
 		.desc = "Push m64fp onto the FPU register stack.",
 		.opcode = { 0xDD }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M80FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M80 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FLD m80fp", .orig_opcode = "DB /5",
 		.desc = "Push m80fp onto the FPU register stack.",
 		.opcode = { 0xDB }, .oplen = 1,
+	}, {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FLD ST(i)", .orig_opcode = "D9 C0 +i",
+		.desc = "Push ST(i) onto the FPU register stack.",
+		.opcode = { 0xD9, 0xC0 }, .oplen = 2,
 	} } },
 	{ "fld1", 1, (struct x64LookupActualIns[]) { {
 		.orig_ins = "FLD1", .orig_opcode = "D9 E8",
@@ -3971,45 +4222,60 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "fldcw", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M2BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FLDCW m2byte", .orig_opcode = "D9 /5",
 		.desc = "Load FPU control word from m2byte.",
 		.opcode = { 0xD9 }, .oplen = 1,
 	} } },
 	{ "fldenv", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M28BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FLDENV m28byte", .orig_opcode = "D9 /4",
 		.desc = "Load FPU environment from m14byte or m28byte.",
 		.opcode = { 0xD9 }, .oplen = 1,
 	} } },
-	{ "fmul", 2, (struct x64LookupActualIns[]) { {
+	{ "fmul", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x8, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FMUL m32fp", .orig_opcode = "D8 /1",
 		.desc = "Multiply ST(0) by m32fp and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x8, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FMUL m64fp", .orig_opcode = "DC /1",
 		.desc = "Multiply ST(0) by m64fp and store result in ST(0).",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FMUL ST(0), ST(i)", .orig_opcode = "D8 C8 +i",
+		.desc = "Multiply ST(0) by ST(i) and store result in ST(0).",
+		.opcode = { 0xD8, 0xC8 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FMUL ST(i), ST(0)", .orig_opcode = "DC C8 +i",
+		.desc = "Multiply ST(i) by ST(0) and store result in ST(i).",
+		.opcode = { 0xDC, 0xC8 }, .oplen = 2,
 	} } },
-	{ "fmulp", 1, (struct x64LookupActualIns[]) { {
+	{ "fmulp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FMULP ST(i), ST(0)", .orig_opcode = "DE C8 +i",
+		.desc = "Multiply ST(i) by ST(0), store result in ST(i), and pop the register stack.",
+		.opcode = { 0xDE, 0xC8 }, .oplen = 2,
+	}, {
 		.orig_ins = "FMULP", .orig_opcode = "DE C9",
 		.desc = "Multiply ST(1) by ST(0), store result in ST(1), and pop the register stack.",
 		.opcode = { 0xDE, 0xC9 }, .oplen = 2,
 	} } },
 	{ "fimul", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x8, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIMUL m32int", .orig_opcode = "DA /1",
 		.desc = "Multiply ST(0) by m32int and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x8, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FIMUL m16int", .orig_opcode = "DE /1",
 		.desc = "Multiply ST(0) by m16int and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
@@ -4044,16 +4310,23 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Round ST(0) to an integer.",
 		.opcode = { 0xD9, 0xFC }, .oplen = 2,
 	} } },
+	{ "frstor", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x20, 
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FRSTOR m108byte", .orig_opcode = "DD /4",
+		.desc = "Load FPU state from m94byte or m108byte.",
+		.opcode = { 0xDD }, .oplen = 1,
+	} } },
 	{ "fsave", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M108BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FSAVE m108byte", .orig_opcode = "9B DD /6",
 		.desc = "Store FPU state to m94byte or m108byte after checking for pending unmasked floating-point exceptions. Then re-initialize the FPU.",
 		.prefixes = 0x9B, .opcode = { 0xDD }, .oplen = 1,
 	} } },
 	{ "fnsave", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x30, 
-		.args = { M108BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FNSAVE m108byte", .orig_opcode = "DD /6",
 		.desc = "Store FPU environment to m94byte or m108byte without checking for pending unmasked floating-point exceptions. Then re-initialize the FPU.",
 		.opcode = { 0xDD }, .oplen = 1,
@@ -4078,74 +4351,213 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Computes square root of ST(0) and stores the result in ST(0).",
 		.opcode = { 0xD9, 0xFA }, .oplen = 2,
 	} } },
-	{ "fsub", 2, (struct x64LookupActualIns[]) { {
+	{ "fst", 3, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x10, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FST m32fp", .orig_opcode = "D9 /2",
+		.desc = "Copy ST(0) to m32fp.",
+		.opcode = { 0xD9 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x10, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FST m64fp", .orig_opcode = "DD /2",
+		.desc = "Copy ST(0) to m64fp.",
+		.opcode = { 0xDD }, .oplen = 1,
+	}, {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FST ST(i)", .orig_opcode = "DD D0 +i",
+		.desc = "Copy ST(0) to ST(i).",
+		.opcode = { 0xDD, 0xD0 }, .oplen = 2,
+	} } },
+	{ "fstp", 4, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x18, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTP m32fp", .orig_opcode = "D9 /3",
+		.desc = "Copy ST(0) to m32fp and pop register stack.",
+		.opcode = { 0xD9 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x18, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTP m64fp", .orig_opcode = "DD /3",
+		.desc = "Copy ST(0) to m64fp and pop register stack.",
+		.opcode = { 0xDD }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M80 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTP m80fp", .orig_opcode = "DB /7",
+		.desc = "Copy ST(0) to m80fp and pop register stack.",
+		.opcode = { 0xDB }, .oplen = 1,
+	}, {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FSTP ST(i)", .orig_opcode = "DD D8 +i",
+		.desc = "Copy ST(0) to ST(i) and pop register stack.",
+		.opcode = { 0xDD, 0xD8 }, .oplen = 2,
+	} } },
+	{ "fstcw", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTCW m2byte", .orig_opcode = "9B D9 /7",
+		.desc = "Store FPU control word to m2byte after checking for pending unmasked floating-point exceptions.",
+		.prefixes = 0x9B, .opcode = { 0xD9 }, .oplen = 1,
+	} } },
+	{ "fnstcw", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FNSTCW m2byte", .orig_opcode = "D9 /7",
+		.desc = "Store FPU control word to m2byte without checking for pending unmasked floating-point exceptions.",
+		.opcode = { 0xD9 }, .oplen = 1,
+	} } },
+	{ "fstenv", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x30, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTENV m28byte", .orig_opcode = "9B D9 /6",
+		.desc = "Store FPU environment to m14byte or m28byte after checking for pending unmasked floating-point exceptions. Then mask all floating-point exceptions.",
+		.prefixes = 0x9B, .opcode = { 0xD9 }, .oplen = 1,
+	} } },
+	{ "fnstenv", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x30, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FNSTENV m28byte", .orig_opcode = "D9 /6",
+		.desc = "Store FPU environment to m14byte or m28byte without checking for pending unmasked floating-point exceptions. Then mask all floating-point exceptions.",
+		.opcode = { 0xD9 }, .oplen = 1,
+	} } },
+	{ "fstsw", 2, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FSTSW m2byte", .orig_opcode = "9B DD /7",
+		.desc = "Store FPU status word at m2byte after checking for pending unmasked floating-point exceptions.",
+		.prefixes = 0x9B, .opcode = { 0xDD }, .oplen = 1,
+	}, {
+		.args = { AX }, .arglen = 1,
+		.orig_ins = "FSTSW AX", .orig_opcode = "9B DF E0",
+		.desc = "Store FPU status word in AX register after checking for pending unmasked floating-point exceptions.",
+		.prefixes = 0x9B, .opcode = { 0xDF, 0xE0 }, .oplen = 2,
+	} } },
+	{ "fnstsw", 2, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x38, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FNSTSW m2byte", .orig_opcode = "DD /7",
+		.desc = "Store FPU status word at m2byte without checking for pending unmasked floating-point exceptions.",
+		.opcode = { 0xDD }, .oplen = 1,
+	}, {
+		.args = { AX }, .arglen = 1,
+		.orig_ins = "FNSTSW AX", .orig_opcode = "DF E0",
+		.desc = "Store FPU status word in AX register without checking for pending unmasked floating-point exceptions.",
+		.opcode = { 0xDF, 0xE0 }, .oplen = 2,
+	} } },
+	{ "fsub", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FSUB m32fp", .orig_opcode = "D8 /4",
 		.desc = "Subtract m32fp from ST(0) and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FSUB m64fp", .orig_opcode = "DC /4",
 		.desc = "Subtract m64fp from ST(0) and store result in ST(0).",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FSUB ST(0), ST(i)", .orig_opcode = "D8 E0 +i",
+		.desc = "Subtract ST(i) from ST(0) and store result in ST(0).",
+		.opcode = { 0xD8, 0xE0 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FSUB ST(i), ST(0)", .orig_opcode = "DC E0 +i",
+		.desc = "Subtract ST(0) from ST(i) and store result in ST(i).",
+		.opcode = { 0xDC, 0xE0 }, .oplen = 2,
 	} } },
-	{ "fsubp", 1, (struct x64LookupActualIns[]) { {
+	{ "fsubp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FSUBP ST(i), ST(0)", .orig_opcode = "DE E0 +i",
+		.desc = "Subtract ST(0) from ST(i), store result in ST(i), and pop register stack.",
+		.opcode = { 0xDE, 0xE0 }, .oplen = 2,
+	}, {
 		.orig_ins = "FSUBP", .orig_opcode = "DE E1",
 		.desc = "Subtract ST(0) from ST(1), store result in ST(1), and pop register stack.",
 		.opcode = { 0xDE, 0xE1 }, .oplen = 2,
 	} } },
 	{ "fisub", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FISUB m32int", .orig_opcode = "DA /4",
 		.desc = "Subtract m32int from ST(0) and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x20, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FISUB m16int", .orig_opcode = "DE /4",
 		.desc = "Subtract m16int from ST(0) and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
 	} } },
-	{ "fsubr", 2, (struct x64LookupActualIns[]) { {
+	{ "fsubr", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M32FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FSUBR m32fp", .orig_opcode = "D8 /5",
 		.desc = "Subtract ST(0) from m32fp and store result in ST(0).",
 		.opcode = { 0xD8 }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M64FP }, .arglen = 1, .mem_operand = 1,
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FSUBR m64fp", .orig_opcode = "DC /5",
 		.desc = "Subtract ST(0) from m64fp and store result in ST(0).",
 		.opcode = { 0xDC }, .oplen = 1,
+	}, {
+		.args = { ST_0, ST }, .arglen = 2, .reg_operand = 2,
+		.orig_ins = "FSUBR ST(0), ST(i)", .orig_opcode = "D8 E8 +i",
+		.desc = "Subtract ST(0) from ST(i) and store result in ST(0).",
+		.opcode = { 0xD8, 0xE8 }, .oplen = 2,
+	}, {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FSUBR ST(i), ST(0)", .orig_opcode = "DC E8 +i",
+		.desc = "Subtract ST(i) from ST(0) and store result in ST(i).",
+		.opcode = { 0xDC, 0xE8 }, .oplen = 2,
 	} } },
-	{ "fsubrp", 1, (struct x64LookupActualIns[]) { {
+	{ "fsubrp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST, ST_0 }, .arglen = 2, .reg_operand = 1,
+		.orig_ins = "FSUBRP ST(i), ST(0)", .orig_opcode = "DE E8 +i",
+		.desc = "Subtract ST(i) from ST(0), store result in ST(i), and pop register stack.",
+		.opcode = { 0xDE, 0xE8 }, .oplen = 2,
+	}, {
 		.orig_ins = "FSUBRP", .orig_opcode = "DE E9",
 		.desc = "Subtract ST(1) from ST(0), store result in ST(1), and pop register stack.",
 		.opcode = { 0xDE, 0xE9 }, .oplen = 2,
 	} } },
 	{ "fisubr", 2, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M32INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FISUBR m32int", .orig_opcode = "DA /5",
 		.desc = "Subtract ST(0) from m32int and store result in ST(0).",
 		.opcode = { 0xDA }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { M16INT }, .arglen = 1, .mem_operand = 1,
+		.args = { M128 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FISUBR m16int", .orig_opcode = "DE /5",
 		.desc = "Subtract ST(0) from m16int and store result in ST(0).",
 		.opcode = { 0xDE }, .oplen = 1,
 	} } },
-	{ "fucom", 1, (struct x64LookupActualIns[]) { {
+	{ "ftst", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "FTST", .orig_opcode = "D9 E4",
+		.desc = "Compare ST(0) with 0.0.",
+		.opcode = { 0xD9, 0xE4 }, .oplen = 2,
+	} } },
+	{ "fucom", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FUCOM ST(i)", .orig_opcode = "DD E0 +i",
+		.desc = "Compare ST(0) with ST(i).",
+		.opcode = { 0xDD, 0xE0 }, .oplen = 2,
+	}, {
 		.orig_ins = "FUCOM", .orig_opcode = "DD E1",
 		.desc = "Compare ST(0) with ST(1).",
 		.opcode = { 0xDD, 0xE1 }, .oplen = 2,
 	} } },
-	{ "fucomp", 1, (struct x64LookupActualIns[]) { {
+	{ "fucomp", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FUCOMP ST(i)", .orig_opcode = "DD E8 +i",
+		.desc = "Compare ST(0) with ST(i) and pop register stack.",
+		.opcode = { 0xDD, 0xE8 }, .oplen = 2,
+	}, {
 		.orig_ins = "FUCOMP", .orig_opcode = "DD E9",
 		.desc = "Compare ST(0) with ST(1) and pop register stack.",
 		.opcode = { 0xDD, 0xE9 }, .oplen = 2,
@@ -4160,21 +4572,40 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Classify value or number in ST(0).",
 		.opcode = { 0xD9, 0xE5 }, .oplen = 2,
 	} } },
-	{ "fxch", 1, (struct x64LookupActualIns[]) { {
+	{ "fxch", 2, (struct x64LookupActualIns[]) { {
+		.args = { ST }, .arglen = 1, .reg_operand = 1,
+		.orig_ins = "FXCH ST(i)", .orig_opcode = "D9 C8 +i",
+		.desc = "Exchange the contents of ST(0) and ST(i).",
+		.opcode = { 0xD9, 0xC8 }, .oplen = 2,
+	}, {
 		.orig_ins = "FXCH", .orig_opcode = "D9 C9",
 		.desc = "Exchange the contents of ST(0) and ST(1).",
 		.opcode = { 0xD9, 0xC9 }, .oplen = 2,
 	} } },
+	{ "fxrstor", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x8, 
+		.args = { M512 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FXRSTOR m512byte", .orig_opcode = "0F AE /1",
+		.desc = "Restore the x87 FPU, MMX, XMM, and MXCSR register state from m512byte.",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	} } },
+	{ "fxrstor64", 1, (struct x64LookupActualIns[]) { {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x8, 
+		.args = { M512 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "FXRSTOR64 m512byte", .orig_opcode = "REX.W+ 0F AE /1",
+		.desc = "Restore the x87 FPU, MMX, XMM, and MXCSR register state from m512byte.",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	} } },
 	{ "fxsave", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x0, 
-		.args = { M512BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M512 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FXSAVE m512byte", .orig_opcode = "0F AE /0",
 		.desc = "Save the x87 FPU, MMX, XMM, and MXCSR register state to m512byte.",
 		.opcode = { 0x0F, 0xAE }, .oplen = 2,
 	} } },
 	{ "fxsave64", 1, (struct x64LookupActualIns[]) { {
 		.rex = 0x48, .modrmreq = true, .modrm = 0x0, 
-		.args = { M512BYTE }, .arglen = 1, .mem_operand = 1,
+		.args = { M512 }, .arglen = 1, .mem_operand = 1,
 		.orig_ins = "FXSAVE64 m512byte", .orig_opcode = "REX.W+ 0F AE /0",
 		.desc = "Save the x87 FPU, MMX, XMM, and MXCSR register state to m512byte.",
 		.opcode = { 0x0F, 0xAE }, .oplen = 2,
@@ -4542,8 +4973,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "INS m8, DX", .orig_opcode = "6C",
 		.desc = "Input byte from I/O port specified in DX into memory location specified in ES:(E)DI or RDI.",
 		.opcode = { 0x6C }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, DX }, .arglen = 2,
+	}, {
+		.args = { M128, DX }, .arglen = 2,
 		.orig_ins = "INS m16, DX", .orig_opcode = "6D",
 		.desc = "Input word from I/O port specified in DX into memory location specified in ES:(E)DI or RDI.",
 		.opcode = { 0x6D }, .oplen = 1,
@@ -4988,7 +5419,7 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Jump near if 0 (ZF=1).",
 		.opcode = { 0x0F, 0x84 }, .oplen = 2,
 	} } },
-	{ "jmp", 7, (struct x64LookupActualIns[]) { {
+	{ "jmp", 6, (struct x64LookupActualIns[]) { {
 		.args = { REL8 }, .arglen = 1,
 		.orig_ins = "JMP rel8", .orig_opcode = "EB cb",
 		.desc = "Jump short, RIP = RIP + 8-bit displacement sign extended to 64-bits",
@@ -5012,19 +5443,13 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0xFF }, .oplen = 1,
 	}, {
 		.modrmreq = true, .modrm = 0x28, 
-		.args = { FARPTR1616 }, .arglen = 1,
-		.orig_ins = "JMP m16:16", .orig_opcode = "FF /5",
-		.desc = "Jump far, absolute indirect, address given in m16:16",
-		.opcode = { 0xFF }, .oplen = 1,
-	}, {
-		.modrmreq = true, .modrm = 0x28, 
-		.args = { FARPTR1632 }, .arglen = 1,
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "JMP m16:32", .orig_opcode = "FF /5",
 		.desc = "Jump far, absolute indirect, address given in m16:32.",
 		.opcode = { 0xFF }, .oplen = 1,
 	}, {
 		.rex = 0x48, .modrmreq = true, .modrm = 0x28, 
-		.args = { FARPTR1664 }, .arglen = 1,
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "JMP m16:64", .orig_opcode = "REX.W+ FF /5",
 		.desc = "Jump far, absolute indirect, address given in m16:64.",
 		.opcode = { 0xFF }, .oplen = 1,
@@ -5036,7 +5461,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "lar", 6, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LAR r16, r16/m16", .orig_opcode = "0F 02 /r",
 		.desc = "r16 = access rights referenced by r16/m16",
 		.opcode = { 0x0F, 0x02 }, .oplen = 2,
@@ -5047,8 +5472,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "r16 = access rights referenced by r16/m16",
 		.opcode = { 0x0F, 0x02 }, .oplen = 2,
 	}, {
-		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R32, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.modrmreq = true, .modrmreg = true, 
+		.args = { R32, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LAR r32, r32/m16", .orig_opcode = "0F 02 /r",
 		.desc = "reg = access rights referenced by r32/m16",
 		.opcode = { 0x0F, 0x02 }, .oplen = 2,
@@ -5059,8 +5484,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "reg = access rights referenced by r32/m16",
 		.opcode = { 0x0F, 0x02 }, .oplen = 2,
 	}, {
-		.rex = 0x48, .modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R64, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
+		.args = { R64, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LAR r64, r32/m16", .orig_opcode = "REX.W+ 0F 02 /r",
 		.desc = "reg = access rights referenced by r32/m16",
 		.opcode = { 0x0F, 0x02 }, .oplen = 2,
@@ -5087,57 +5512,57 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "lss", 3, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, FARPTR1616 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSS r16, m16:16", .orig_opcode = "0F B2 /r",
 		.desc = "Load SS:r16 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB2 }, .oplen = 2,
 	}, {
 		.modrmreq = true, .modrmreg = true, 
-		.args = { R32, FARPTR1632 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R32, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSS r32, m16:32", .orig_opcode = "0F B2 /r",
 		.desc = "Load SS:r32 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB2 }, .oplen = 2,
 	}, {
 		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
-		.args = { R64, FARPTR1664 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R64, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSS r64, m16:64", .orig_opcode = "REX.W+ 0F B2 /r",
 		.desc = "Load SS:r64 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB2 }, .oplen = 2,
 	} } },
 	{ "lfs", 3, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, FARPTR1616 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LFS r16, m16:16", .orig_opcode = "0F B4 /r",
 		.desc = "Load FS:r16 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB4 }, .oplen = 2,
 	}, {
 		.modrmreq = true, .modrmreg = true, 
-		.args = { R32, FARPTR1632 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R32, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LFS r32, m16:32", .orig_opcode = "0F B4 /r",
 		.desc = "Load FS:r32 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB4 }, .oplen = 2,
 	}, {
 		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
-		.args = { R64, FARPTR1664 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R64, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LFS r64, m16:64", .orig_opcode = "REX.W+ 0F B4 /r",
 		.desc = "Load FS:r64 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB4 }, .oplen = 2,
 	} } },
 	{ "lgs", 3, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, FARPTR1616 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LGS r16, m16:16", .orig_opcode = "0F B5 /r",
 		.desc = "Load GS:r16 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB5 }, .oplen = 2,
 	}, {
 		.modrmreq = true, .modrmreg = true, 
-		.args = { R32, FARPTR1632 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R32, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LGS r32, m16:32", .orig_opcode = "0F B5 /r",
 		.desc = "Load GS:r32 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB5 }, .oplen = 2,
 	}, {
 		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
-		.args = { R64, FARPTR1664 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R64, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LGS r64, m16:64", .orig_opcode = "REX.W+ 0F B5 /r",
 		.desc = "Load GS:r64 with far pointer from memory.",
 		.opcode = { 0x0F, 0xB5 }, .oplen = 2,
@@ -5215,14 +5640,14 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "lgdt", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x10, 
-		.args = { M16&64 }, .arglen = 1,
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "LGDT m16&64", .orig_opcode = "0F 01 /2",
 		.desc = "Load m into GDTR.",
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
 	} } },
 	{ "lidt", 1, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x18, 
-		.args = { M16&64 }, .arglen = 1,
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "LIDT m16&64", .orig_opcode = "0F 01 /3",
 		.desc = "Load m into IDTR.",
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
@@ -5263,8 +5688,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "LODS m8", .orig_opcode = "AC",
 		.desc = "For legacy mode, Load byte at address DS:(E)SI into AL. For 64-bit mode load byte at address (R)SI into AL.",
 		.opcode = { 0xAC }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "LODS m16", .orig_opcode = "AD",
 		.desc = "For legacy mode, Load word at address DS:(E)SI into AX. For 64-bit mode load word at address (R)SI into AX.",
 		.opcode = { 0xAD }, .oplen = 1,
@@ -5322,7 +5747,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "lsl", 6, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSL r16, r16/m16", .orig_opcode = "0F 03 /r",
 		.desc = "Load: r16 = segment limit, selector r16/m16.",
 		.opcode = { 0x0F, 0x03 }, .oplen = 2,
@@ -5333,8 +5758,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Load: r16 = segment limit, selector r16/m16.",
 		.opcode = { 0x0F, 0x03 }, .oplen = 2,
 	}, {
-		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R32, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.modrmreq = true, .modrmreg = true, 
+		.args = { R32, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSL r32, r32/m16", .orig_opcode = "0F 03 /r",
 		.desc = "Load: r32 = segment limit, selector r32/m16.",
 		.opcode = { 0x0F, 0x03 }, .oplen = 2,
@@ -5345,8 +5770,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Load: r32 = segment limit, selector r32/m16.",
 		.opcode = { 0x0F, 0x03 }, .oplen = 2,
 	}, {
-		.rex = 0x48, .modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R64, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
+		.args = { R64, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "LSL r64, r32/m16", .orig_opcode = "REX.W+ 0F 03 /r",
 		.desc = "Load: r64 = segment limit, selector r32/m16",
 		.opcode = { 0x0F, 0x03 }, .oplen = 2,
@@ -5940,7 +6365,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "movbe", 6, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { R16, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { R16, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "MOVBE r16, m16", .orig_opcode = "0F 38 F0 /r",
 		.desc = "Reverse byte order in m16 and move to r16",
 		.opcode = { 0x0F, 0x38, 0xF0 }, .oplen = 3,
@@ -5958,7 +6383,7 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0x0F, 0x38, 0xF0 }, .oplen = 3,
 	}, {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
-		.args = { M16, R16 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.args = { M128, R16 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
 		.orig_ins = "MOVBE m16, r16", .orig_opcode = "0F 38 F1 /r",
 		.desc = "Reverse byte order in r16 and move to m16",
 		.opcode = { 0x0F, 0x38, 0xF1 }, .oplen = 3,
@@ -6107,27 +6532,29 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Move quadword from mm to mm/m64.",
 		.opcode = { 0x0F, 0x7F }, .oplen = 2,
 	}, {
+		.modrmreq = true, .modrmreg = true, 
 		.args = { XMM, M64 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
-		.orig_ins = "MOVQ xmm1, xmm2/m64", .orig_opcode = "F3 0F 7E",
+		.orig_ins = "MOVQ xmm1, xmm2/m64", .orig_opcode = "F3 0F 7E /r",
 		.desc = "Move quadword from xmm2/mem64 to xmm1.",
 		.prefixes = 0xF3, .opcode = { 0x0F, 0x7E }, .oplen = 2,
 		.preffered = true,
 	}, {
+		.modrmreq = true, .modrmreg = true, 
 		.args = { XMM, XMM }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
-		.orig_ins = "MOVQ xmm1, xmm2/m64", .orig_opcode = "F3 0F 7E",
+		.orig_ins = "MOVQ xmm1, xmm2/m64", .orig_opcode = "F3 0F 7E /r",
 		.desc = "Move quadword from xmm2/mem64 to xmm1.",
 		.prefixes = 0xF3, .opcode = { 0x0F, 0x7E }, .oplen = 2,
 		.preffered = true,
 	}, {
-		.pref66 = true, 
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
 		.args = { M64, XMM }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
-		.orig_ins = "MOVQ xmm2/m64, xmm1", .orig_opcode = "66 0F D6",
+		.orig_ins = "MOVQ xmm2/m64, xmm1", .orig_opcode = "66 0F D6 /r",
 		.desc = "Move quadword from xmm1 to xmm2/mem64.",
 		.opcode = { 0x0F, 0xD6 }, .oplen = 2,
 	}, {
-		.pref66 = true, 
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
 		.args = { XMM, XMM }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
-		.orig_ins = "MOVQ xmm2/m64, xmm1", .orig_opcode = "66 0F D6",
+		.orig_ins = "MOVQ xmm2/m64, xmm1", .orig_opcode = "66 0F D6 /r",
 		.desc = "Move quadword from xmm1 to xmm2/mem64.",
 		.opcode = { 0x0F, 0xD6 }, .oplen = 2,
 	} } },
@@ -6345,8 +6772,9 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0x0F, 0xE7 }, .oplen = 2,
 	} } },
 	{ "movq2dq", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrmreg = true, 
 		.args = { XMM, MM }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
-		.orig_ins = "MOVQ2DQ xmm, mm", .orig_opcode = "F3 0F D6",
+		.orig_ins = "MOVQ2DQ xmm, mm", .orig_opcode = "F3 0F D6 /r",
 		.desc = "Move quadword from mmx to low quadword of xmm.",
 		.prefixes = 0xF3, .opcode = { 0x0F, 0xD6 }, .oplen = 2,
 	} } },
@@ -6355,8 +6783,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "MOVS m8, m8", .orig_opcode = "A4",
 		.desc = "For legacy mode, Move byte from address DS:(E)SI to ES:(E)DI. For 64-bit mode move byte from address (R|E)SI to (R|E)DI.",
 		.opcode = { 0xA4 }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, M16 }, .arglen = 2,
+	}, {
+		.args = { M128, M128 }, .arglen = 2,
 		.orig_ins = "MOVS m16, m16", .orig_opcode = "A5",
 		.desc = "For legacy mode, move word from address DS:(E)SI to ES:(E)DI. For 64-bit mode move word at address (R|E)SI to (R|E)DI.",
 		.opcode = { 0xA5 }, .oplen = 1,
@@ -7212,8 +7640,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "OUTS DX, m8", .orig_opcode = "6E",
 		.desc = "Output byte from memory location specified in DS:(E)SI or RSI to I/O port specified in DX.",
 		.opcode = { 0x6E }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { DX, M16 }, .arglen = 2,
+	}, {
+		.args = { DX, M128 }, .arglen = 2,
 		.orig_ins = "OUTS DX, m16", .orig_opcode = "6F",
 		.desc = "Output word from memory location specified in DS:(E)SI or RSI to I/O port specified in DX.",
 		.opcode = { 0x6F }, .oplen = 1,
@@ -7857,6 +8285,32 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Compare packed qwords in xmm2/m128 and xmm1 for equality.",
 		.opcode = { 0x0F, 0x38, 0x29 }, .oplen = 3,
 	} } },
+	{ "pcmpestri", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPESTRI xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 61 /r",
+		.desc = "Perform a packed comparison of string data with explicit lengths, generating an index, and storing the result in ECX.",
+		.opcode = { 0x0F, 0x3A, 0x61 }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPESTRI xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 61 /r",
+		.desc = "Perform a packed comparison of string data with explicit lengths, generating an index, and storing the result in ECX.",
+		.opcode = { 0x0F, 0x3A, 0x61 }, .oplen = 3,
+	} } },
+	{ "pcmpestrm", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPESTRM xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 60 /r",
+		.desc = "Perform a packed comparison of string data with explicit lengths, generating a mask, and storing the result in XMM0",
+		.opcode = { 0x0F, 0x3A, 0x60 }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPESTRM xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 60 /r",
+		.desc = "Perform a packed comparison of string data with explicit lengths, generating a mask, and storing the result in XMM0",
+		.opcode = { 0x0F, 0x3A, 0x60 }, .oplen = 3,
+	} } },
 	{ "pcmpgtb", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, 
 		.args = { MM, M64 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
@@ -7945,6 +8399,32 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Compare packed signed qwords in xmm2/m128 and xmm1 for greater than.",
 		.opcode = { 0x0F, 0x38, 0x37 }, .oplen = 3,
 	} } },
+	{ "pcmpistri", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPISTRI xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 63 /r",
+		.desc = "Perform a packed comparison of string data with implicit lengths, generating an index, and storing the result in ECX.",
+		.opcode = { 0x0F, 0x3A, 0x63 }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPISTRI xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 63 /r",
+		.desc = "Perform a packed comparison of string data with implicit lengths, generating an index, and storing the result in ECX.",
+		.opcode = { 0x0F, 0x3A, 0x63 }, .oplen = 3,
+	} } },
+	{ "pcmpistrm", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPISTRM xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 62 /r",
+		.desc = "Perform a packed comparison of string data with implicit lengths, generating a mask, and storing the result in XMM0.",
+		.opcode = { 0x0F, 0x3A, 0x62 }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PCMPISTRM xmm1, xmm2/m128, imm8", .orig_opcode = "66 0F 3A 62 /r",
+		.desc = "Perform a packed comparison of string data with implicit lengths, generating a mask, and storing the result in XMM0.",
+		.opcode = { 0x0F, 0x3A, 0x62 }, .oplen = 3,
+	} } },
 	{ "pextrb", 3, (struct x64LookupActualIns[]) { {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
 		.args = { R32, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 1, .reg_operand = 2,
@@ -8024,7 +8504,7 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0x0F, 0x3A, 0x15 }, .oplen = 3,
 	}, {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
-		.args = { M16, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 1, .reg_operand = 2,
+		.args = { M128, XMM, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 1, .reg_operand = 2,
 		.orig_ins = "PEXTRW reg/m16, xmm, imm8", .orig_opcode = "66 0F 3A 15 /r ib",
 		.desc = "Extract the word specified by imm8 from xmm and copy it to lowest 16 bits of reg or m16. Zero-extend the result in the destination, r32 or r64.",
 		.opcode = { 0x0F, 0x3A, 0x15 }, .oplen = 3,
@@ -8226,7 +8706,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "pinsrw", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, 
-		.args = { MM, M16, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.args = { MM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "PINSRW mm, r32/m16, imm8", .orig_opcode = "0F C4 /r ib",
 		.desc = "Insert the low word from r32 or from m16 into mm at the word position specified by imm8",
 		.opcode = { 0x0F, 0xC4 }, .oplen = 2,
@@ -8238,7 +8718,7 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0x0F, 0xC4 }, .oplen = 2,
 	}, {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
-		.args = { XMM, M16, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
+		.args = { XMM, M128, IMM8 }, .arglen = 3, .immediate = 3, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "PINSRW xmm, r32/m16, imm8", .orig_opcode = "66 0F C4 /r ib",
 		.desc = "Move the low word of r32 or from m16 into xmm at the word position specified by imm8.",
 		.opcode = { 0x0F, 0xC4 }, .oplen = 2,
@@ -8556,7 +9036,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "pmovsxbq", 2, (struct x64LookupActualIns[]) { {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
-		.args = { XMM, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "PMOVSXBQ xmm1, xmm2/m16", .orig_opcode = "66 0f 38 22 /r",
 		.desc = "Sign extend 2 packed signed 8-bit integers in the low 2 bytes of xmm2/m16 to 2 packed signed 64-bit integers in xmm1.",
 		.opcode = { 0x38, 0x22 }, .oplen = 2,
@@ -8634,7 +9114,7 @@ static const x64LookupGeneralIns x64Table[] = {
 	} } },
 	{ "pmovzxbq", 2, (struct x64LookupActualIns[]) { {
 		.pref66 = true, .modrmreq = true, .modrmreg = true, 
-		.args = { XMM, M16 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
 		.orig_ins = "PMOVZXBQ xmm1, xmm2/m16", .orig_opcode = "66 0f 38 32 /r",
 		.desc = "Zero extend 2 packed 8-bit integers in the low 2 bytes of xmm2/m16 to 2 packed 64-bit integers in xmm1.",
 		.opcode = { 0x38, 0x32 }, .oplen = 2,
@@ -9683,6 +10163,19 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Subtract packed unsigned word integers in xmm2/m128 from packed unsigned word integers in xmm1 and saturate result.",
 		.opcode = { 0x0F, 0xD9 }, .oplen = 2,
 	} } },
+	{ "ptest", 2, (struct x64LookupActualIns[]) { {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, M128 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PTEST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 17 /r",
+		.desc = "Set ZF if xmm2/m128 AND xmm1 result is all 0s. Set CF if xmm2/m128 AND NOT xmm1 result is all 0s.",
+		.opcode = { 0x0F, 0x38, 0x17 }, .oplen = 3,
+	}, {
+		.pref66 = true, .modrmreq = true, .modrmreg = true, 
+		.args = { XMM, XMM }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
+		.orig_ins = "PTEST xmm1, xmm2/m128", .orig_opcode = "66 0F 38 17 /r",
+		.desc = "Set ZF if xmm2/m128 AND xmm1 result is all 0s. Set CF if xmm2/m128 AND NOT xmm1 result is all 0s.",
+		.opcode = { 0x0F, 0x38, 0x17 }, .oplen = 3,
+	} } },
 	{ "punpckhbw", 4, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, 
 		.args = { MM, M64 }, .arglen = 2, .mem_operand = 2, .reg_operand = 1,
@@ -10654,8 +11147,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REP_INS m8, DX", .orig_opcode = "F3 REX.W+ 6C",
 		.desc = "Input RCX bytes from port DX into [RDI].",
 		.prefixes = 0xF3, .opcode = { 0x6C }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, DX }, .arglen = 2,
+	}, {
+		.args = { M128, DX }, .arglen = 2,
 		.orig_ins = "REP_INS m16, DX", .orig_opcode = "F3 6D",
 		.desc = "Input (E)CX words from port DX into ES:[(E)DI.]",
 		.prefixes = 0xF3, .opcode = { 0x6D }, .oplen = 1,
@@ -10685,8 +11178,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REP_MOVS m8, m8", .orig_opcode = "F3 REX.W+ A4",
 		.desc = "Move RCX bytes from [RSI] to [RDI].",
 		.prefixes = 0xF3, .opcode = { 0xA4 }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, M16 }, .arglen = 2,
+	}, {
+		.args = { M128, M128 }, .arglen = 2,
 		.orig_ins = "REP_MOVS m16, m16", .orig_opcode = "F3 A5",
 		.desc = "Move (E)CX words from DS:[(E)SI] to ES:[(E)DI].",
 		.prefixes = 0xF3, .opcode = { 0xA5 }, .oplen = 1,
@@ -10716,8 +11209,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REP_OUTS DX, m8", .orig_opcode = "F3 REX.W+ 6E",
 		.desc = "Output RCX bytes from [RSI] to port DX.",
 		.prefixes = 0xF3, .opcode = { 0x6E }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { DX, M16 }, .arglen = 2,
+	}, {
+		.args = { DX, M128 }, .arglen = 2,
 		.orig_ins = "REP_OUTS DX, m16", .orig_opcode = "F3 6F",
 		.desc = "Output (E)CX words from DS:[(E)SI] to port DX.",
 		.prefixes = 0xF3, .opcode = { 0x6F }, .oplen = 1,
@@ -10766,6 +11259,37 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Load RCX quadwords from [RSI] to RAX.",
 		.prefixes = 0xF3, .opcode = { 0xAD }, .oplen = 1,
 	} } },
+	{ "rep stos", 5, (struct x64LookupActualIns[]) { {
+		.args = { M8 }, .arglen = 1,
+		.orig_ins = "REP_STOS m8", .orig_opcode = "F3 AA",
+		.desc = "Fill (E)CX bytes at ES:[(E)DI] with AL.",
+		.prefixes = 0xF3, .opcode = { 0xAA }, .oplen = 1,
+		.preffered = true,
+	}, {
+		.rex = 0x48, 
+		.args = { M8 }, .arglen = 1,
+		.orig_ins = "REP_STOS m8", .orig_opcode = "F3 REX.W+ AA",
+		.desc = "Fill RCX bytes at [RDI] with AL.",
+		.prefixes = 0xF3, .opcode = { 0xAA }, .oplen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
+		.orig_ins = "REP_STOS m16", .orig_opcode = "F3 AB",
+		.desc = "Fill (E)CX words at ES:[(E)DI] with AX.",
+		.prefixes = 0xF3, .opcode = { 0xAB }, .oplen = 1,
+		.preffered = true,
+	}, {
+		.args = { M32 }, .arglen = 1,
+		.orig_ins = "REP_STOS m32", .orig_opcode = "F3 AB",
+		.desc = "Fill (E)CX doublewords at ES:[(E)DI] with EAX.",
+		.prefixes = 0xF3, .opcode = { 0xAB }, .oplen = 1,
+		.preffered = true,
+	}, {
+		.rex = 0x48, 
+		.args = { M64 }, .arglen = 1,
+		.orig_ins = "REP_STOS m64", .orig_opcode = "F3 REX.W+ AB",
+		.desc = "Fill RCX quadwords at [RDI] with RAX.",
+		.prefixes = 0xF3, .opcode = { 0xAB }, .oplen = 1,
+	} } },
 	{ "repe cmps", 5, (struct x64LookupActualIns[]) { {
 		.args = { M8, M8 }, .arglen = 2,
 		.orig_ins = "REPE_CMPS m8, m8", .orig_opcode = "F3 A6",
@@ -10778,8 +11302,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REPE_CMPS m8, m8", .orig_opcode = "F3 REX.W+ A6",
 		.desc = "Find non-matching bytes in [RDI] and [RSI].",
 		.prefixes = 0xF3, .opcode = { 0xA6 }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, M16 }, .arglen = 2,
+	}, {
+		.args = { M128, M128 }, .arglen = 2,
 		.orig_ins = "REPE_CMPS m16, m16", .orig_opcode = "F3 A7",
 		.desc = "Find nonmatching words in ES:[(E)DI] and DS:[(E)SI].",
 		.prefixes = 0xF3, .opcode = { 0xA7 }, .oplen = 1,
@@ -10809,8 +11333,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REPE_SCAS m8", .orig_opcode = "F3 REX.W+ AE",
 		.desc = "Find non-AL byte starting at [RDI].",
 		.prefixes = 0xF3, .opcode = { 0xAE }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "REPE_SCAS m16", .orig_opcode = "F3 AF",
 		.desc = "Find non-AX word starting at ES:[(E)DI].",
 		.prefixes = 0xF3, .opcode = { 0xAF }, .oplen = 1,
@@ -10840,8 +11364,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REPNE_CMPS m8, m8", .orig_opcode = "F2 REX.W+ A6",
 		.desc = "Find matching bytes in [RDI] and [RSI].",
 		.prefixes = 0xF2, .opcode = { 0xA6 }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16, M16 }, .arglen = 2,
+	}, {
+		.args = { M128, M128 }, .arglen = 2,
 		.orig_ins = "REPNE_CMPS m16, m16", .orig_opcode = "F2 A7",
 		.desc = "Find matching words in ES:[(E)DI] and DS:[(E)SI].",
 		.prefixes = 0xF2, .opcode = { 0xA7 }, .oplen = 1,
@@ -10871,8 +11395,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "REPNE_SCAS m8", .orig_opcode = "F2 REX.W+ AE",
 		.desc = "Find AL, starting at [RDI].",
 		.prefixes = 0xF2, .opcode = { 0xAE }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "REPNE_SCAS m16", .orig_opcode = "F2 AF",
 		.desc = "Find AX, starting at ES:[(E)DI].",
 		.prefixes = 0xF2, .opcode = { 0xAF }, .oplen = 1,
@@ -11820,8 +12344,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "SCAS m8", .orig_opcode = "AE",
 		.desc = "Compare AL with byte at ES:(E)DI or RDI, then set status flags.",
 		.opcode = { 0xAE }, .oplen = 1,
-	}, {.pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "SCAS m16", .orig_opcode = "AF",
 		.desc = "Compare AX with word at ES:(E)DI or RDI, then set status flags.",
 		.opcode = { 0xAF }, .oplen = 1,
@@ -12461,8 +12985,8 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Stores segment selector from LDTR in r/m16.",
 		.opcode = { 0x0F, 0x00 }, .oplen = 2,
 	}, {
-		.rex = 0x48, .modrmreq = true, .modrm = 0x0, .pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+		.rex = 0x48, .modrmreq = true, .modrm = 0x0, 
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "SLDT r64/m16", .orig_opcode = "REX.W+ 0F 00 /0",
 		.desc = "Stores segment selector from LDTR in r64/m16.",
 		.opcode = { 0x0F, 0x00 }, .oplen = 2,
@@ -12473,11 +12997,11 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Stores segment selector from LDTR in r64/m16.",
 		.opcode = { 0x0F, 0x00 }, .oplen = 2,
 	} } },
-	{ "smsw", 5, (struct x64LookupActualIns[]) { {
+	{ "smsw", 6, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, .pref66 = true, 
 		.args = { M16 }, .arglen = 1,
-		.orig_ins = "SMSW r32/m16", .orig_opcode = "0F 01 /4",
-		.desc = "Store machine status word in low-order 16 bits of r32/m16; high-order 16 bits of r32 are undefined.",
+		.orig_ins = "SMSW r/m16", .orig_opcode = "0F 01 /4",
+		.desc = "Store machine status word to r/m16.",
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
 	}, {
 		.modrmreq = true, .modrm = 0x20, .pref66 = true, 
@@ -12487,13 +13011,19 @@ static const x64LookupGeneralIns x64Table[] = {
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
 	}, {
 		.modrmreq = true, .modrm = 0x20, 
+		.args = { M128 }, .arglen = 1,
+		.orig_ins = "SMSW r32/m16", .orig_opcode = "0F 01 /4",
+		.desc = "Store machine status word in low-order 16 bits of r32/m16; high-order 16 bits of r32 are undefined.",
+		.opcode = { 0x0F, 0x01 }, .oplen = 2,
+	}, {
+		.modrmreq = true, .modrm = 0x20, 
 		.args = { R32 }, .arglen = 1,
 		.orig_ins = "SMSW r32/m16", .orig_opcode = "0F 01 /4",
 		.desc = "Store machine status word in low-order 16 bits of r32/m16; high-order 16 bits of r32 are undefined.",
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
 	}, {
-		.rex = 0x48, .modrmreq = true, .modrm = 0x20, .pref66 = true, 
-		.args = { M16 }, .arglen = 1,
+		.rex = 0x48, .modrmreq = true, .modrm = 0x20, 
+		.args = { M128 }, .arglen = 1,
 		.orig_ins = "SMSW r64/m16", .orig_opcode = "REX.W+ 0F 01 /4",
 		.desc = "Store machine status word in low-order 16 bits of r64/m16; high-order 16 bits of r32 are undefined.",
 		.opcode = { 0x0F, 0x01 }, .oplen = 2,
@@ -12555,6 +13085,85 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "SQRTSS xmm1, xmm2/m32", .orig_opcode = "F3 0F 51 /r",
 		.desc = "Computes square root of the low single- precision floating-point value in xmm2/m32 and stores the results in xmm1.",
 		.prefixes = 0xF3, .opcode = { 0x0F, 0x51 }, .oplen = 2,
+	} } },
+	{ "stc", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "STC", .orig_opcode = "F9",
+		.desc = "Set CF flag.",
+		.opcode = { 0xF9 }, .oplen = 1,
+	} } },
+	{ "std", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "STD", .orig_opcode = "FD",
+		.desc = "Set DF flag.",
+		.opcode = { 0xFD }, .oplen = 1,
+	} } },
+	{ "sti", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "STI", .orig_opcode = "FB",
+		.desc = "Set interrupt flag; external, maskable interrupts enabled at the end of the next instruction.",
+		.opcode = { 0xFB }, .oplen = 1,
+	} } },
+	{ "stmxcsr", 1, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x18, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "STMXCSR m32", .orig_opcode = "0F AE /3",
+		.desc = "Store contents of MXCSR register to m32.",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	} } },
+	{ "stos", 4, (struct x64LookupActualIns[]) { {
+		.args = { M8 }, .arglen = 1,
+		.orig_ins = "STOS m8", .orig_opcode = "AA",
+		.desc = "For legacy mode, store AL at address ES:(E)DI; For 64-bit mode store AL at address RDI or EDI.",
+		.opcode = { 0xAA }, .oplen = 1,
+	}, {
+		.args = { M128 }, .arglen = 1,
+		.orig_ins = "STOS m16", .orig_opcode = "AB",
+		.desc = "For legacy mode, store AX at address ES:(E)DI; For 64-bit mode store AX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	}, {
+		.args = { M32 }, .arglen = 1,
+		.orig_ins = "STOS m32", .orig_opcode = "AB",
+		.desc = "For legacy mode, store EAX at address ES:(E)DI; For 64-bit mode store EAX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	}, {
+		.rex = 0x48, 
+		.args = { M64 }, .arglen = 1,
+		.orig_ins = "STOS m64", .orig_opcode = "REX.W+ AB",
+		.desc = "Store RAX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	} } },
+	{ "stosb", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "STOSB", .orig_opcode = "AA",
+		.desc = "For legacy mode, store AL at address ES:(E)DI; For 64-bit mode store AL at address RDI or EDI.",
+		.opcode = { 0xAA }, .oplen = 1,
+	} } },
+	{ "stosw", 1, (struct x64LookupActualIns[]) { {
+		.pref66 = true, 
+		.orig_ins = "STOSW", .orig_opcode = "PREF.66+ AB",
+		.desc = "For legacy mode, store AX at address ES:(E)DI; For 64-bit mode store AX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	} } },
+	{ "stosd", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "STOSD", .orig_opcode = "AB",
+		.desc = "For legacy mode, store EAX at address ES:(E)DI; For 64-bit mode store EAX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	} } },
+	{ "stosq", 1, (struct x64LookupActualIns[]) { {
+		.rex = 0x48, 
+		.orig_ins = "STOSQ", .orig_opcode = "REX.W+ AB",
+		.desc = "Store RAX at address RDI or EDI.",
+		.opcode = { 0xAB }, .oplen = 1,
+	} } },
+	{ "str", 2, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x8, .pref66 = true, 
+		.args = { M16 }, .arglen = 1,
+		.orig_ins = "STR r/m16", .orig_opcode = "0F 00 /1",
+		.desc = "Stores segment selector from TR in r/m16.",
+		.opcode = { 0x0F, 0x00 }, .oplen = 2,
+	}, {
+		.modrmreq = true, .modrm = 0x8, .pref66 = true, 
+		.args = { R16 }, .arglen = 1,
+		.orig_ins = "STR r/m16", .orig_opcode = "0F 00 /1",
+		.desc = "Stores segment selector from TR in r/m16.",
+		.opcode = { 0x0F, 0x00 }, .oplen = 2,
 	} } },
 	{ "sub", 38, (struct x64LookupActualIns[]) { {
 		.args = { AL, IMM8 }, .arglen = 2, .immediate = 2,
@@ -12886,6 +13495,136 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "SYSRET pw", .orig_opcode = "REX.W+ 0F 07",
 		.desc = "Return to 64-bit mode from fast system call",
 		.opcode = { 0x0F, 0x07 }, .oplen = 2,
+	} } },
+	{ "test", 22, (struct x64LookupActualIns[]) { {
+		.args = { AL, IMM8 }, .arglen = 2, .immediate = 2,
+		.orig_ins = "TEST AL, imm8", .orig_opcode = "A8 ib",
+		.desc = "AND imm8 with AL; set SF, ZF, PF according to result.",
+		.opcode = { 0xA8 }, .oplen = 1,
+	}, {.pref66 = true, 
+		.args = { AX, IMM16 }, .arglen = 2, .immediate = 2,
+		.orig_ins = "TEST AX, imm16", .orig_opcode = "A9 iw",
+		.desc = "AND imm16 with AX; set SF, ZF, PF according to result.",
+		.opcode = { 0xA9 }, .oplen = 1,
+	}, {
+		.args = { EAX, IMM32 }, .arglen = 2, .immediate = 2,
+		.orig_ins = "TEST EAX, imm32", .orig_opcode = "A9 id",
+		.desc = "AND imm32 with EAX; set SF, ZF, PF according to result.",
+		.opcode = { 0xA9 }, .oplen = 1,
+	}, {
+		.rex = 0x48, 
+		.args = { RAX, IMM32 }, .arglen = 2, .immediate = 2,
+		.orig_ins = "TEST RAX, imm32", .orig_opcode = "REX.W+ A9 id",
+		.desc = "AND imm32 sign-extended to 64-bits with RAX; set SF, ZF, PF according to result.",
+		.opcode = { 0xA9 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, 
+		.args = { M8, IMM8 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m8, imm8", .orig_opcode = "F6 /0 ib",
+		.desc = "AND imm8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0xF6 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, 
+		.args = { R8, IMM8 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m8, imm8", .orig_opcode = "F6 /0 ib",
+		.desc = "AND imm8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0xF6 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, .pref66 = true, 
+		.args = { M16, IMM16 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m16, imm16", .orig_opcode = "F7 /0 iw",
+		.desc = "AND imm16 with r/m16; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, .pref66 = true, 
+		.args = { R16, IMM16 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m16, imm16", .orig_opcode = "F7 /0 iw",
+		.desc = "AND imm16 with r/m16; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, 
+		.args = { M32, IMM32 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m32, imm32", .orig_opcode = "F7 /0 id",
+		.desc = "AND imm32 with r/m32; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrm = 0x0, 
+		.args = { R32, IMM32 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m32, imm32", .orig_opcode = "F7 /0 id",
+		.desc = "AND imm32 with r/m32; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x0, 
+		.args = { M64, IMM32 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m64, imm32", .orig_opcode = "REX.W+ F7 /0 id",
+		.desc = "AND imm32 sign-extended to 64-bits with r/m64; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x0, 
+		.args = { R64, IMM32 }, .arglen = 2, .immediate = 2, .mem_operand = 1,
+		.orig_ins = "TEST r/m64, imm32", .orig_opcode = "REX.W+ F7 /0 id",
+		.desc = "AND imm32 sign-extended to 64-bits with r/m64; set SF, ZF, PF according to result.",
+		.opcode = { 0xF7 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { M8, R8 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m8, r8", .orig_opcode = "84 /r",
+		.desc = "AND r8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0x84 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { M8, RH }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m8, r8", .orig_opcode = "84 /r",
+		.desc = "AND r8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0x84 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { R8, R8 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m8, r8", .orig_opcode = "84 /r",
+		.desc = "AND r8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0x84 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { R8, RH }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m8, r8", .orig_opcode = "84 /r",
+		.desc = "AND r8 with r/m8; set SF, ZF, PF according to result.",
+		.opcode = { 0x84 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, .pref66 = true, 
+		.args = { M16, R16 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m16, r16", .orig_opcode = "85 /r",
+		.desc = "AND r16 with r/m16; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, .pref66 = true, 
+		.args = { R16, R16 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m16, r16", .orig_opcode = "85 /r",
+		.desc = "AND r16 with r/m16; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { M32, R32 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m32, r32", .orig_opcode = "85 /r",
+		.desc = "AND r32 with r/m32; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
+	}, {
+		.modrmreq = true, .modrmreg = true, 
+		.args = { R32, R32 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m32, r32", .orig_opcode = "85 /r",
+		.desc = "AND r32 with r/m32; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
+		.args = { M64, R64 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m64, r64", .orig_opcode = "REX.W+ 85 /r",
+		.desc = "AND r64 with r/m64; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrmreg = true, 
+		.args = { R64, R64 }, .arglen = 2, .mem_operand = 1, .reg_operand = 2,
+		.orig_ins = "TEST r/m64, r64", .orig_opcode = "REX.W+ 85 /r",
+		.desc = "AND r64 with r/m64; set SF, ZF, PF according to result.",
+		.opcode = { 0x85 }, .oplen = 1,
 	} } },
 	{ "tzcnt", 6, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrmreg = true, .pref66 = true, 
@@ -13587,6 +14326,44 @@ static const x64LookupGeneralIns x64Table[] = {
 		.desc = "Bitwise exclusive-OR of xmm2/m128 and xmm1.",
 		.opcode = { 0x0F, 0x57 }, .oplen = 2,
 	} } },
+	{ "xrstor", 3, (struct x64LookupActualIns[]) { {
+		.modrmreq = true, .modrm = 0x28, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR mem", .orig_opcode = "0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	}, {
+		.modrmreq = true, .modrm = 0x28, .pref66 = true, 
+		.args = { M16 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR mem", .orig_opcode = "0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	}, {
+		.modrmreq = true, .modrm = 0x28, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR mem", .orig_opcode = "0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	} } },
+	{ "xrstor64", 3, (struct x64LookupActualIns[]) { {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x28, 
+		.args = { M32 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR64 mem", .orig_opcode = "REX.W+ 0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x28, .pref66 = true, 
+		.args = { M16 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR64 mem", .orig_opcode = "REX.W+ 0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	}, {
+		.rex = 0x48, .modrmreq = true, .modrm = 0x28, 
+		.args = { M64 }, .arglen = 1, .mem_operand = 1,
+		.orig_ins = "XRSTOR64 mem", .orig_opcode = "REX.W+ 0F AE /5",
+		.desc = "Restore processor extended states from memory. The states are specified by EDX:EAX",
+		.opcode = { 0x0F, 0xAE }, .oplen = 2,
+	} } },
 	{ "xsave", 3, (struct x64LookupActualIns[]) { {
 		.modrmreq = true, .modrm = 0x20, 
 		.args = { M32 }, .arglen = 1, .mem_operand = 1,
@@ -13667,16 +14444,21 @@ static const x64LookupGeneralIns x64Table[] = {
 		.orig_ins = "XSETBV", .orig_opcode = "0F 01 D1",
 		.desc = "Write the value in EDX:EAX to the XCR specified by ECX.",
 		.opcode = { 0x0F, 0x01, 0xD1 }, .oplen = 3,
+	} } },
+	{ "xtest", 1, (struct x64LookupActualIns[]) { {
+		.orig_ins = "XTEST", .orig_opcode = "0F 01 D6",
+		.desc = "Test if executing in a transactional region",
+		.opcode = { 0x0F, 0x01, 0xD6 }, .oplen = 3,
 	} } }
 };
 
 
-#define imm(value) (x64Operand) { ((value) == 1 && ONE) | IMM8 | IMM16 | IMM32 | IMM64, (value) }
-// #define imm(value) (x64Operand) { ((value) == 1 && ONE) | (value < 0x100 && IMM8) | (value < 0x10000 && IMM16) | (value < 0x100000000 && IMM32) | IMM64, (value) }
-#define im64(value) (x64Operand) { ((value) == 1 && ONE) | IMM64, (value) }
-#define im32(value) (x64Operand) { ((value) == 1 && ONE) | IMM32, (value) }
-#define im16(value) (x64Operand) { ((value) == 1 && ONE) | IMM16, (value) }
-#define im8(value) (x64Operand) { ((value) == 1 && ONE) | IMM8, (value) }
+#define imm(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM8 | IMM16 | IMM32 | IMM64, (value) }
+// #define imm(value) (x64Operand) { ((value) == 1 ? ONE : 0) | (value < 0x100 && IMM8) | (value < 0x10000 && IMM16) | (value < 0x100000000 && IMM32) | IMM64, (value) }
+#define im64(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM64, (value) }
+#define im32(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM32, (value) }
+#define im16(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM16, (value) }
+#define im8(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM8, (value) }
 
 #define rh (x64Operand) { RH | R8 }
 #define al (x64Operand) { AL | R8 }
@@ -13688,108 +14470,259 @@ static const x64LookupGeneralIns x64Table[] = {
 #define dh (x64Operand) { RH, 6 }
 #define bh (x64Operand) { RH, 7 }
 
+#define sil (x64Operand) { R8, 4 }
+#define dil (x64Operand) { R8, 5 }
+#define bpl (x64Operand) { R8, 6 }
+#define spl (x64Operand) { R8, 7 }
+#define r8b (x64Operand) { R8, 8 }
+#define r9b (x64Operand) { R8, 9 }
+#define r10b (x64Operand) { R8, 10 }
+#define r11b (x64Operand) { R8, 11 }
+#define r12b (x64Operand) { R8, 12 }
+#define r13b (x64Operand) { R8, 13 }
+#define r14b (x64Operand) { R8, 14 }
+#define r15b (x64Operand) { R8, 15 }
+
+
 #define ax (x64Operand) { AX | R16 }
 #define cx (x64Operand) { R16, 1 }
 #define dx (x64Operand) { DX | R16, 2 }
 #define bx (x64Operand) { R16, 3 }
 
-#define $eax 0x0
+#define si (x64Operand) { R16, 4 }
+#define di (x64Operand) { R16, 5 }
+#define bp (x64Operand) { R16, 6 }
+#define sp (x64Operand) { R16, 7 }
+#define r8w (x64Operand) { R16, 8 }
+#define r9w (x64Operand) { R16, 9 }
+#define r10w (x64Operand) { R16, 10 }
+#define r11w (x64Operand) { R16, 11 }
+#define r12w (x64Operand) { R16, 12 }
+#define r13w (x64Operand) { R16, 13 }
+#define r14w (x64Operand) { R16, 14 }
+#define r15w (x64Operand) { R16, 15 }
+
+enum x64RegisterReference {
+	$eax, $ecx, $edx, $ebx, $esp, $ebp, $esi, $edi, $r8d, $r9d, $r10d, $r11d, $r12d,
+	$r13d, $r14d, $r15d, $rax, $rcx, $rdx, $rbx, $rsp, $rbp, $rsi, $rdi, $r8, $r9, $r10,
+	$r11, $r12, $r13, $r14, $r15, $rip, $es, $cs, $ss, $ds, $fs, $gs, $none = 0xfff0
+};
+
 #define eax (x64Operand) { EAX | R32, $eax }
-#define $ecx 0x1
 #define ecx (x64Operand) { R32, $ecx }
-#define $edx 0x2
 #define edx (x64Operand) { R32, $edx }
-#define $ebx 0x3
 #define ebx (x64Operand) { R32, $ebx }
-#define $esp 0x4
 #define esp (x64Operand) { R32, $esp }
-#define $ebp 0x5
 #define ebp (x64Operand) { R32, $ebp }
-#define $esi 0x6
 #define esi (x64Operand) { R32, $esi }
-#define $edi 0x7
 #define edi (x64Operand) { R32, $edi }
-#define $r8d 0x8
 #define r8d (x64Operand) { R32, $r8d }
-#define $r9d 0x9
 #define r9d (x64Operand) { R32, $r9d }
-#define $r10d 0xA
 #define r10d (x64Operand) { R32, $r10d }
-#define $r11d 0xB
 #define r11d (x64Operand) { R32, $r11d }
-#define $r12d 0xC
 #define r12d (x64Operand) { R32, $r12d }
-#define $r13d 0xD
 #define r13d (x64Operand) { R32, $r13d }
-#define $r14d 0xE
 #define r14d (x64Operand) { R32, $r14d }
-#define $r15d 0xF
 #define r15d (x64Operand) { R32, $r15d }
 
-#define $none 0xffff
-#define $rip 0x20
-#define $rax 0x10
 #define rax (x64Operand) { RAX | R64, 0x0 }
-#define $rcx 0x11
 #define rcx (x64Operand) { R64, 0x1 }
-#define $rdx 0x12
 #define rdx (x64Operand) { R64, 0x2 }
-#define $rbx 0x13
 #define rbx (x64Operand) { R64, 0x3 }
-#define $rsp 0x14
 #define rsp (x64Operand) { R64, 0x4 }
-#define $rbp 0x15
 #define rbp (x64Operand) { R64, 0x5 }
-#define $rsi 0x16
 #define rsi (x64Operand) { R64, 0x6 }
-#define $rdi 0x17
 #define rdi (x64Operand) { R64, 0x7 }
-#define $r8 0x18
 #define r8 (x64Operand) { R64, 0x8 }
-#define $r9 0x19
 #define r9 (x64Operand) { R64, 0x9 }
-#define $r10 0x1A
 #define r10 (x64Operand) { R64, 0xA }
-#define $r11 0x1B
 #define r11 (x64Operand) { R64, 0xB }
-#define $r12 0x1C
 #define r12 (x64Operand) { R64, 0xC }
-#define $r13 0x1D
 #define r13 (x64Operand) { R64, 0xD }
-#define $r14 0x1E
 #define r14 (x64Operand) { R64, 0xE }
-#define $r15 0x1F
 #define r15 (x64Operand) { R64, 0xF }
 
+// SSE and AVX registers
+#define xmm0 (x64Operand) { XMM_0 | XMM, 0 }
+#define xmm1 (x64Operand) { XMM, 1 }
+#define xmm2 (x64Operand) { XMM, 2 }
+#define xmm3 (x64Operand) { XMM, 3 }
+#define xmm4 (x64Operand) { XMM, 4 }
+#define xmm5 (x64Operand) { XMM, 5 }
+#define xmm6 (x64Operand) { XMM, 6 }
+#define xmm7 (x64Operand) { XMM, 7 }
+#define xmm8 (x64Operand) { XMM, 8 }
+#define xmm9 (x64Operand) { XMM, 9 }
+#define xmm10 (x64Operand) { XMM, 10 }
+#define xmm11 (x64Operand) { XMM, 11 }
+#define xmm12 (x64Operand) { XMM, 12 }
+#define xmm13 (x64Operand) { XMM, 13 }
+#define xmm14 (x64Operand) { XMM, 14 }
+#define xmm15 (x64Operand) { XMM, 15 }
+#define xmm16 (x64Operand) { XMM, 16 }
+#define xmm17 (x64Operand) { XMM, 17 }
+#define xmm18 (x64Operand) { XMM, 18 }
+#define xmm19 (x64Operand) { XMM, 19 }
+#define xmm20 (x64Operand) { XMM, 20 }
+#define xmm21 (x64Operand) { XMM, 21 }
+#define xmm22 (x64Operand) { XMM, 22 }
+#define xmm23 (x64Operand) { XMM, 23 }
+#define xmm24 (x64Operand) { XMM, 24 }
+#define xmm25 (x64Operand) { XMM, 25 }
+#define xmm26 (x64Operand) { XMM, 26 }
+#define xmm27 (x64Operand) { XMM, 27 }
+#define xmm28 (x64Operand) { XMM, 28 }
+#define xmm29 (x64Operand) { XMM, 29 }
+#define xmm30 (x64Operand) { XMM, 30 }
+#define xmm31 (x64Operand) { XMM, 31 }
+
+#define ymm0 (x64Operand) { YMM, 0 }
+#define ymm1 (x64Operand) { YMM, 1 }
+#define ymm2 (x64Operand) { YMM, 2 }
+#define ymm3 (x64Operand) { YMM, 3 }
+#define ymm4 (x64Operand) { YMM, 4 }
+#define ymm5 (x64Operand) { YMM, 5 }
+#define ymm6 (x64Operand) { YMM, 6 }
+#define ymm7 (x64Operand) { YMM, 7 }
+#define ymm8 (x64Operand) { YMM, 8 }
+#define ymm9 (x64Operand) { YMM, 9 }
+#define ymm10 (x64Operand) { YMM, 10 }
+#define ymm11 (x64Operand) { YMM, 11 }
+#define ymm12 (x64Operand) { YMM, 12 }
+#define ymm13 (x64Operand) { YMM, 13 }
+#define ymm14 (x64Operand) { YMM, 14 }
+#define ymm15 (x64Operand) { YMM, 15 }
+#define ymm16 (x64Operand) { YMM, 16 }
+#define ymm17 (x64Operand) { YMM, 17 }
+#define ymm18 (x64Operand) { YMM, 18 }
+#define ymm19 (x64Operand) { YMM, 19 }
+#define ymm20 (x64Operand) { YMM, 20 }
+#define ymm21 (x64Operand) { YMM, 21 }
+#define ymm22 (x64Operand) { YMM, 22 }
+#define ymm23 (x64Operand) { YMM, 23 }
+#define ymm24 (x64Operand) { YMM, 24 }
+#define ymm25 (x64Operand) { YMM, 25 }
+#define ymm26 (x64Operand) { YMM, 26 }
+#define ymm27 (x64Operand) { YMM, 27 }
+#define ymm28 (x64Operand) { YMM, 28 }
+#define ymm29 (x64Operand) { YMM, 29 }
+#define ymm30 (x64Operand) { YMM, 30 }
+#define ymm31 (x64Operand) { YMM, 31 }
+
+#define zmm0 (x64Operand) { ZMM, 0 }
+#define zmm1 (x64Operand) { ZMM, 1 }
+#define zmm2 (x64Operand) { ZMM, 2 }
+#define zmm3 (x64Operand) { ZMM, 3 }
+#define zmm4 (x64Operand) { ZMM, 4 }
+#define zmm5 (x64Operand) { ZMM, 5 }
+#define zmm6 (x64Operand) { ZMM, 6 }
+#define zmm7 (x64Operand) { ZMM, 7 }
+#define zmm8 (x64Operand) { ZMM, 8 }
+#define zmm9 (x64Operand) { ZMM, 9 }
+#define zmm10 (x64Operand) { ZMM, 10 }
+#define zmm11 (x64Operand) { ZMM, 11 }
+#define zmm12 (x64Operand) { ZMM, 12 }
+#define zmm13 (x64Operand) { ZMM, 13 }
+#define zmm14 (x64Operand) { ZMM, 14 }
+#define zmm15 (x64Operand) { ZMM, 15 }
+#define zmm16 (x64Operand) { ZMM, 16 }
+#define zmm17 (x64Operand) { ZMM, 17 }
+#define zmm18 (x64Operand) { ZMM, 18 }
+#define zmm19 (x64Operand) { ZMM, 19 }
+#define zmm20 (x64Operand) { ZMM, 20 }
+#define zmm21 (x64Operand) { ZMM, 21 }
+#define zmm22 (x64Operand) { ZMM, 22 }
+#define zmm23 (x64Operand) { ZMM, 23 }
+#define zmm24 (x64Operand) { ZMM, 24 }
+#define zmm25 (x64Operand) { ZMM, 25 }
+#define zmm26 (x64Operand) { ZMM, 26 }
+#define zmm27 (x64Operand) { ZMM, 27 }
+#define zmm28 (x64Operand) { ZMM, 28 }
+#define zmm29 (x64Operand) { ZMM, 29 }
+#define zmm30 (x64Operand) { ZMM, 30 }
+#define zmm31 (x64Operand) { ZMM, 31 }
+
+
+
+// mm registers
+#define mm0 (x64Operand) { MM, 0 }
+#define mm1 (x64Operand) { MM, 1 }
+#define mm2 (x64Operand) { MM, 2 }
+#define mm3 (x64Operand) { MM, 3 }
+#define mm4 (x64Operand) { MM, 4 }
+#define mm5 (x64Operand) { MM, 5 }
+#define mm6 (x64Operand) { MM, 6 }
+#define mm7 (x64Operand) { MM, 7 }
+
+// control registers
+#define cr0 (x64Operand) { CR0_7, 0 }
+#define cr1 (x64Operand) { CR0_7, 1 }
+#define cr2 (x64Operand) { CR0_7, 2 }
+#define cr3 (x64Operand) { CR0_7, 3 }
+#define cr4 (x64Operand) { CR0_7, 4 }
+#define cr5 (x64Operand) { CR0_7, 5 }
+#define cr6 (x64Operand) { CR0_7, 6 }
+#define cr7 (x64Operand) { CR0_7, 7 }
+#define cr8 (x64Operand) { CR8, 8 }
+
+// debug registers
+#define dr0 (x64Operand) { DREG, 0 }
+#define dr1 (x64Operand) { DREG, 1 }
+#define dr2 (x64Operand) { DREG, 2 }
+#define dr3 (x64Operand) { DREG, 3 }
+#define dr4 (x64Operand) { DREG, 4 }
+#define dr5 (x64Operand) { DREG, 5 }
+#define dr6 (x64Operand) { DREG, 6 }
+#define dr7 (x64Operand) { DREG, 7 }
+
+// FPU registers
+#define st0 (x64Operand) { ST_0 | ST, 0 }
+#define st(i) (x64Operand) { ST, i }
+
+
 // segment registers
-#define $es 1
 #define es (x64Operand) { SEGREG, 1 }
-#define $cs 2
 #define cs (x64Operand) { SEGREG, 2 }
-#define $ss 3
 #define ss (x64Operand) { SEGREG, 3 }
-#define $ds 4
 #define ds (x64Operand) { SEGREG, 4 }
-#define $fs 5
 #define fs (x64Operand) { FS | SEGREG, 5 }
-#define $gs 6
 #define gs (x64Operand) { GS | SEGREG, 6 }
 
 #define lb(l) (x64Operand) { LABEL, #l }
 
-#define X64MEM_1_ARGS(disp)                     (disp & 0xffffffff | (u64) 0x1 << 36) /*0x10 << 32*/
-#define X64MEM_2_ARGS(disp, base)               (disp & 0xffffffff | ((base) > 0xf ? (((u64) (base) == 0x20 && (0x1 << 61)) || ((u64) ((base) & 0xf) << 32)) : ((u64) 0x1 << 60) | (u64) ((base) & 0xf) << 32))
-#define X64MEM_3_ARGS(disp, base, index)        (X64MEM_2_ARGS(disp, base) | (u64) ((index) & 0x1f) << 40)
-#define X64MEM_4_ARGS(disp, base, index, scale) (X64MEM_3_ARGS(disp, base, index) | (u64) ((scale) == 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48)
-#define X64MEM_5_ARGS(disp, base, index, scale, segment) (disp & 0xffffffff\
-	| ((base) > 0xf ? (((u64) (base) == 0x20 && (1 << 61)) || ((base) == 0xffff && ((u64) 0x1 << 36)) ((u64) ((base) & 0xf) << 32)) : ((u64) 1 << 60) | (u64) ((base) & 0xf) << 32)) /*If the operand is more than 32 bits wide or is equal to the RIP register,\
-	set mode to wide addressing and set base register, or RIP addressing*/\
-	| (u64) ((index) & 0x1f) << 40\
-	| (u64) ((scale) == 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48\
-	| (u64) ((segment) & (u64) 0x7) << 56)
+// DISP    : 0x00000000ffffffff
+// BASE    : 0x0000001f00000000
+// INDEX   : 0x00001f0000000000
+// SCALE   : 0x0003000000000000
+// SEG     : 0x0700000000000000
+// ADDR_OR : 0x1000000000000000
+// RIP     : 0x2000000000000000
+
+//hi = (disp, base) => (disp & 0xffffffffn | ((base) & 0x10n ? ( (BigInt((base) == 0x20n) && (1n << 61n)) | (BigInt((base) == 0xfff0n) && (0x1n << 36n)) | BigInt((base & 0xfn) << 32n) ) : (0x1n << 60n) | ((base) & 0xfn) << 32n))
+
+
+#define X64MEM_1_ARGS(base)                      (((base) & 0x10 ?\
+																										( (u64) ((base) == 0x20) ? ((u64) 0x1 << 61) : ((u64) ((base) == 0xfff0) ? ((u64) 0x1 << 36) : ((u64) ((base) & 0xf) << 32) )) :\
+																										((u64) 0x1 << 60) | (u64) ((base) & 0xf) << 32) |\
+																									(u64) 0x10 << 40)
+#define X64MEM_2_ARGS(base, disp)                     (disp & 0xffffffff | X64MEM_1_ARGS(base))
+#define X64MEM_3_ARGS(base, disp, index)        (disp & 0xffffffff | ((base) & 0x10 ?\
+																										( (u64) ((base) == 0x20) ? ((u64) 0x1 << 61) : ((u64) ((base) == 0xfff0) ? ((u64) 0x1 << 36) : ((u64) ((base) & 0xf) << 32) )) :\
+																										((u64) 0x1 << 60) | (u64) ((base) & 0xf) << 32) |\
+																									(u64) ((index) == 0xfff0 ? 0x10 : (index) & 0xf) << 40)
+#define X64MEM_4_ARGS(base, disp, index, scale) (X64MEM_3_ARGS(base, disp, index) | (u64) ((scale) <= 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48)
+#define X64MEM_5_ARGS(base, disp, index, scale, segment) (disp & 0xffffffff\
+	| ((base) & 0x10 ?\
+			( (u64) ((base) == 0x20) ? ((u64) 0x1 << 61) : ((u64) ((base) == 0xfff0) ? ((u64) 0x1 << 36) : ((u64) ((base) & 0xf) << 32) )) :\
+			((u64) 0x1 << 60) | (u64) ((base) & 0xf) << 32) /*If the operand is more than 32 bits wide or is equal to the RIP register, set mode to wide addressing and set base register, or RIP addressing*/\
+	| (u64) ((index) == 0xfff0 ? 0x10 : (index) & 0xf) << 40\
+	| (u64) ((scale) <= 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48\
+	| (u64) (((segment) - $rip) & (u64) 0x7) << 56) /* minusing from $rip, because segment registers are 1 + their value for simplification. */
 
 #define GET_4TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
-#define X64MEM_MACRO_CHOOSER(...)     GET_4TH_ARG(__VA_ARGS__, X64MEM_5_ARGS, X64MEM_4_ARGS, X64MEM_3_ARGS,                 X64MEM_2_ARGS, X64MEM_1_ARGS, )
+#define X64MEM_MACRO_CHOOSER(...) \
+    GET_4TH_ARG(__VA_ARGS__, X64MEM_5_ARGS, X64MEM_4_ARGS, X64MEM_3_ARGS, \
+                X64MEM_2_ARGS, X64MEM_1_ARGS, )
 
 #define x64mem(...) X64MEM_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
 #define m8(...) (x64Operand) { M8, x64mem(__VA_ARGS__) }
@@ -13798,11 +14731,13 @@ static const x64LookupGeneralIns x64Table[] = {
 #define m64(...) (x64Operand) { M64, x64mem(__VA_ARGS__) }
 #define m128(...) (x64Operand) { M128, x64mem(__VA_ARGS__) }
 #define m256(...) (x64Operand) { M256, x64mem(__VA_ARGS__) }
-#define mem(...) (x64Operand) { M8 | M16 | M32 | M64 | M128 | M256, x64mem(__VA_ARGS__) }
+#define m512(...) (x64Operand) { M512, x64mem(__VA_ARGS__) }
+#define mem(...) (x64Operand) { M8 | M16 | M32 | M64 | M128 | M256 | M512, x64mem(__VA_ARGS__) }
 
 #define END RET, {0}, ((x64Ins) {0, {0}})
 
 u64 label(char* name);
 u32 x64emit(x64Ins* ins, char* opcode_dest);
 char* x64as(x64 p, u32* len);
+char* x64stringify(x64 p);
 void (*run(void* mem, u32 size))();
