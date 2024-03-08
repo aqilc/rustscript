@@ -7,9 +7,9 @@
  *     #define VEC_H_IMPLEMENTATION
  *     #include <vec.h>
  *
- * Options provided by defines:
+ * Options provided by defines before including:
  *   VEC_H_STATIC_INLINE:
- *     Implements all methods as static inline, for increased performance when calling.
+ *     Implements all methods as static inline, for increased performance when calling. Automatically defines VEC_H_IMPLEMENTATION.
  *   VEC_H_CALLOC:
  *     Name for user-provided calloc(size_t, size_t) function.
  *   VEC_H_REALLOC:
@@ -27,32 +27,16 @@
 #ifndef VEC_H
 #define VEC_H
 
-#define VEC_H_IMPLEMENTATION
-#define VEC_H_STATIC_INLINE
+// #define VEC_H_IMPLEMENTATION
+// #define VEC_H_STATIC_INLINE
 
 #ifdef VEC_H_STATIC_INLINE
+	#define VEC_H_IMPLEMENTATION
 	#define VEC_H_EXTERN static inline
 #else
 	#define VEC_H_EXTERN 
 #endif
 
-#if !defined VEC_H_FREE || !defined VEC_H_REALLOC || !defined VEC_H_CALLOC
-	#include <stdlib.h>
-#endif
-
-#ifndef VEC_H_CALLOC
-	#define VEC_H_CALLOC calloc
-#endif
-
-#ifndef VEC_H_REALLOC
-	#define VEC_H_REALLOC realloc
-#endif
-
-#ifndef VEC_H_FREE
-	#define VEC_H_FREE free
-#endif
-
-// #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -69,12 +53,11 @@ struct vecdata_ {
 #define vpush(x, ...) (*((typeof(x)) vpush_((void**)&(x), sizeof(*(x)))) = (typeof(*x)) __VA_ARGS__)
 // vpush(data, 5); expands to something like: *(int*)vpush_((void**) &data, 4) = (int) 5;
 
-
 #define vpusharr(x, ...) (memcpy(vpush_((void**)&(x), sizeof((typeof(*(x))[]) __VA_ARGS__)), (typeof(*(x))[]) __VA_ARGS__, sizeof((typeof(*(x))[]) __VA_ARGS__)))
 #define vcpyarr(x, n, ...) (memcpy((x) + (n), (typeof(*(x))[]) __VA_ARGS__, sizeof((typeof(*(x))[]) __VA_ARGS__)))
 
 // Push n items onto the vector, so we can allocate more space at once
-#define vpushn(x, n, y) /*_Generic(*(x), */vpushn_((void**) &(x), (n), sizeof(*(x)), &((typeof(*(x))) {y}))//)
+#define vpushn(x, n, y) vpushn_((void**) &(x), (n), sizeof(*(x)), &((typeof(*(x))) {y}))
 // One for structs since that prev one didn't work for structs
 #define vpushnst(x, n, y) vpushn_((void**) &(x), (n), sizeof(*(x)), &((typeof(*(x))) y))
 
@@ -136,6 +119,22 @@ VEC_H_EXTERN char* vfmt(char* str, ...);
 #endif
 
 #ifdef VEC_H_IMPLEMENTATION
+
+#if !defined VEC_H_FREE || !defined VEC_H_REALLOC || !defined VEC_H_CALLOC
+	#include <stdlib.h>
+#endif
+
+#ifndef VEC_H_CALLOC
+	#define VEC_H_CALLOC calloc
+#endif
+
+#ifndef VEC_H_REALLOC
+	#define VEC_H_REALLOC realloc
+#endif
+
+#ifndef VEC_H_FREE
+	#define VEC_H_FREE free
+#endif
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -221,7 +220,7 @@ static inline void* VEC_INTERNAL_PUSH_NAME(void** v, uint32_t size) {
 }
 
 #ifndef VEC_H_STATIC_INLINE
-	void* vpush_(void** v, uint32_t size) { return VEC_INTERNAL_PUSH_NAME(v, size); }
+	VEC_H_EXTERN void* vpush_(void** v, uint32_t size) { return VEC_INTERNAL_PUSH_NAME(v, size); }
 #endif
 
 // Gets length of formatted string to allocate from vector first, and then basically writes to the ptr returned by push
@@ -260,10 +259,9 @@ VEC_H_EXTERN char* vfmt(char* str, ...) {
 	static char* fmtstr;
 	if(!fmtstr) fmtstr = vnew();
 	
-	va_list args;
+	va_list args, args2;
 	va_start(args, str);
-	va_list args2;
-	va_start(args2, str);
+	va_copy(args2, args);
 	uint32_t len = vsnprintf(NULL, 0, str, args) + 1;
 	if(len - _DATA(fmtstr)->used > 0)
 		VEC_INTERNAL_PUSH_NAME((void**) &fmtstr, len - _DATA(fmtstr)->used);
