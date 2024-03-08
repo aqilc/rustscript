@@ -1,15 +1,18 @@
 # Reference: https://stackoverflow.com/a/30602701/10013227
 
-# CC := gcc
-# CFLAGS := -o2 -g -m64 -Ideps/include -Ilib
+CC := gcc
+LINKER := gcc
+OUTPUTFILENAMEOPT := -o 
+CFLAGS := -O2 -g -m64 -Ideps/include -Ilib
 # BUILDDIR := bin
 
-CC := clang-cl
-LINKER := lld-link
-CFLAGS := /Od /MD /Zi /EHsc -m64 -Ideps/include -Ilib -c /D_CRT_SECURE_NO_WARNINGS
-LINKFLAGS := /DEBUG:FULL
+# CC := clang-cl
+# LINKER := lld-link
+# OUTPUTFILENAMEOPT := /OUT:
+# CFLAGS := /Od /MD /Zi /EHsc -m64 -Ideps/include -Ilib -c /D_CRT_SECURE_NO_WARNINGS
+# LINKFLAGS := /DEBUG:FULL
 #/NODEFAULTLIB:libcmt.lib /SUBSYSTEM:CONSOLE	#/LIBPATH:deps/lib
-LIBS := msvcrt.lib
+# LIBS := msvcrt.lib
 #shell32.lib gdi32.lib user32.lib
 BUILDDIR := bin
 
@@ -22,9 +25,20 @@ endef
 ifeq ($(OS),Windows_NT)
 	DLLENDING := .dll
 	DLLFLAGS  := -Wl,--subsystem,windows
+	EXEENDING := .exe
+	STUPIDUNIXSHIT :=
+	CLEAN := rmdir /s /q
 else
 	DLLENDING := .a
 	DLLFLAGS  := 
+	EXEENDING := .bin
+	STUPIDUNIXSHIT := ./
+	CLEAN := rm -rf
+	ifeq (,$(shell command -v mold 2> /dev/null))
+		LINKER := gcc -fuse-ld=ld
+	else
+		LINKER := gcc -fuse-ld=mold
+	endif
 endif
 define c2dll
 $(patsubst %.c,%$(DLLENDING),$(notdir $(1)))
@@ -41,14 +55,14 @@ OBJS := $(call c2o,$(SRCS))
 # BACKDLLS := $(call c2dll,$(BACKSRCS))
 
 # Require the build folder to be done first, DK if this is the right way but it works for now
-all: $(BUILDDIR) | main.exe # $(BACKDLLS)
-	@main.exe
-	@C:\Windows\system32\cmd.exe /C "echo."
+all: $(BUILDDIR) | main$(EXEENDING) # $(BACKDLLS)
+	@$(STUPIDUNIXSHIT)main$(EXEENDING)
+# @C:\Windows\system32\cmd$(EXEENDING) /C "echo."
 
 # back: $(BUILDDIR) | $(BACKDLLS)
 
-main.exe: $(OBJS)
-	$(LINKER) $(LIBS) $^ /OUT:$@ $(LINKFLAGS)
+main$(EXEENDING): $(OBJS)
+	$(LINKER) $(LIBS) $^ $(OUTPUTFILENAMEOPT)$@ $(LINKFLAGS)
 # $(CC) $^ -o $@
 
 # %$(DLLENDING): $(BUILDDIR)/%.o $(BACKDEPS)
@@ -68,8 +82,8 @@ $(BUILDDIR)/%.o: lib/asm/%.c
 	$(CC) $(CFLAGS) -c $^ -o $@
 
 clean:
-	rmdir /s /q $(BUILDDIR)
-	del main.exe
+	$(CLEAN) $(BUILDDIR)
+	del main$(EXEENDING)
 	del *.dll
 
 .PHONY: all clean
