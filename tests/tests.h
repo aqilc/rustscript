@@ -1,7 +1,7 @@
 /*
  * tests.h v3.2.6 - Aqil Contractor @AqilC 2024
  * Licenced under Attribution-NonCommercial-ShareAlike 3.0
- * 
+ *
  * This file is the beginning file of the 'tests.h' testing framework made by Aqil Contractor. To use this framework,
  * include this file at the top of your testing file, and 'tests_end.h' at the end of your testing file.
  *
@@ -41,6 +41,7 @@
 
 #ifndef NO_PRINT
 #include <stdio.h>
+#include <string.h>
 #else
 #define printf(...) 0
 #define puts(...) 0
@@ -54,8 +55,9 @@ jmp_buf tests_jmp_buf;
 unsigned int sigthing = 0;
 void* sigaddr = 0;
 
-double tests_starttime;
+unsigned long long tests_starttime;
 double tests_totaltime;
+unsigned long long tests_clocks_per_sec;
 _Bool subtest_done = 0;
 int tests_benchprogress;
 int tests_benchiters = 1000;
@@ -78,7 +80,7 @@ void init__(void) {}
 void init(void);
 #pragma comment(linker, "/alternatename:init=init__")
 #else
-void init(void) __attribute__((weak)); 
+void init(void) __attribute__((weak));
 #endif
 #define INIT() void init(void)
 
@@ -121,12 +123,16 @@ void init(void) __attribute__((weak));
 #ifdef _WIN32
 #include <windows.h>
 
-static inline long double get_precise_time() {
+static inline unsigned long long get_precise_time() {
 	LARGE_INTEGER t;
-	static LARGE_INTEGER f;
-	if(!f.QuadPart) QueryPerformanceFrequency(&f);
-	QueryPerformanceCounter(&t);
-	return (long double)t.QuadPart/(long double)f.QuadPart;
+
+	// #if defined __clang__ || defined __GNUC__ && defined __x86_64__
+	// 	t.QuadPart = __builtin_ia32_rdtsc();
+	// #else
+		QueryPerformanceCounter(&t);
+	// #endif
+
+	return t.QuadPart;
 }
 
 LONG WINAPI plswork(PEXCEPTION_POINTERS pinfo) {
@@ -134,15 +140,15 @@ LONG WINAPI plswork(PEXCEPTION_POINTERS pinfo) {
 	longjmp(tests_jmp_buf, 1);
 }
 #else
-#include <sys/time.h>
-#include <sys/resource.h>
+#include <time.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <signal.h>
 
-static inline long double get_precise_time() {
-	struct timeval t;
-	struct timezone tzp;
-	gettimeofday(&t, &tzp);
-	return (long double)t.tv_sec + (long double)t.tv_usec*(long double)1e-6;
+static inline unsigned long long get_precise_time() {
+	struct timespec t = {0};
+	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+	return (unsigned long long) t.tv_sec * 1e9 + t.tv_nsec;
 }
 
 static void handler (int sig, siginfo_t* bruh, void* idc) {
@@ -206,24 +212,26 @@ char* tests_print_mem(void* mem, int size) {
 #define SUB(x) do { subtests_run++;\
 	printf("\n" SUBTESTINDENT x TERMRESET " %-*s", /*subtests_run,*/(int) (TESTNAMELIMIT - sizeof(SUBTESTINDENT) + 1 - sizeof(""x"") + 1), "");\
 	tests_cursubtest = (x); tests_starttime = get_precise_time(); } while(0); while((subtest_done = !subtest_done) || subend_())
+
 static inline _Bool subend_(void) {
 	// printf("asserts: %d, subtest_done: %d, assert_aborted: %d\n", asserts, subtest_done, assert_aborted);
 	if(!assert_aborted) {
-		long double passed_time = (get_precise_time() - tests_starttime);
+		// printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\bstart: %lld, end: %lld", tests_starttime, get_precise_time());
+		double passed_time = (double) (get_precise_time() - tests_starttime) / tests_clocks_per_sec;
 		tests_totaltime += passed_time;
 		double tmul = 1000.0;
 		char* timeunit = "ms";
 		if(passed_time < 9.9e-6) tmul = 1000000000.0, timeunit = "ns";
 		else if(passed_time < 9.9e-3) tmul = 1000000.0, timeunit = "\u03BCs";
 		if(asserts < 12)
-			printf("%.*s" TERMGREENBOLD "%.*s" TERMRESET TERMGREENBGBLACK " PASS "TERMRESET" "TERMBLUEBG" %04.0Lf %s " TERMRESET,
+			printf("%.*s" TERMGREENBOLD "%.*s" TERMRESET TERMGREENBGBLACK " PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET,
 				asserts * 2,
 				"\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b",
 				asserts * 4,
 				"\u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 ",
 				passed_time * tmul, timeunit);
 		else
-			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0Lf %s " TERMRESET,
+			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET,
 			/*Length of the number in `assert`*/ asserts < 10 ? 1 : asserts < 100 ? 2 : asserts < 1000 ? 3 : asserts < 10000 ? 4 : asserts < 100000 ? 5 : asserts < 1000000 ? 6 : asserts < 10000000 ? 7 : asserts < 100000000 ? 8 : asserts < 1000000000 ? 9 : 10,
 			"\b\b\b\b\b\b\b\b\b\b\b\b", asserts, passed_time * tmul, timeunit);
 		subtests_passed++;
@@ -247,21 +255,22 @@ static inline _Bool subend_(void) {
 #define SUBBENCH() if(last_subtest_failed) tests_benchprogress = tests_benchiters; else { printf("\n" SUBTESTINDENT SUBTESTINDENT TERMGRAY "Bench for %s" TERMRESET " %-*s", tests_cursubtest, (int) (TESTNAMELIMIT - 10 - sizeof(SUBTESTINDENT SUBTESTINDENT) + 1 - strlen(tests_cursubtest)), ""); tests_starttime = get_precise_time(); tests_benchprogress = 0; } while ((tests_benchprogress++) < tests_benchiters || benchend_())
 
 static inline _Bool benchend_() {
-	long double passed_time = (get_precise_time() - tests_starttime);
-	long double time_per_iter = passed_time / (long double) tests_benchiters;
+	// printf("\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\bstart: %lld, end: %lld", tests_starttime, get_precise_time());
+	double passed_time = (double) (get_precise_time() - tests_starttime) / tests_clocks_per_sec;
+	double time_per_iter = passed_time / (double) tests_benchiters;
 	tests_totaltime += passed_time;
-	
+
 	double ttmul = 1000.0;
 	char* ttimeunit = "ms";
 	if(passed_time < 9.9e-6) ttmul = 1000000000.0, ttimeunit = "ns";
 	else if(passed_time < 9.9e-3) ttmul = 1000000.0, ttimeunit = "\u03BCs";
-	
+
 	double tmul = 1000.0;
 	char* timeunit = "ms";
 	if(time_per_iter < 9.9e-6) tmul = 1000000000.0, timeunit = "ns";
 	else if(time_per_iter < 9.9e-3) tmul = 1000000.0, timeunit = "\u03BCs";
 
-	printf("\b\b\b\b\b\b\b\b%.*s" TERMYELLOW "%dx " TERMBLUE "%04.0Lf %s/iter" TERMRESET " " TERMBLUEBG " %04.0Lf %s " TERMRESET, tests_benchiters < 10 ? 1 : tests_benchiters < 100 ? 2 : tests_benchiters < 1000 ? 3 : tests_benchiters < 10000 ? 4 : tests_benchiters < 100000 ? 5 : tests_benchiters < 1000000 ? 6 : tests_benchiters < 10000000 ? 7 : tests_benchiters < 100000000 ? 8 : tests_benchiters < 1000000000 ? 9 : 10, "\b\b\b\b\b\b\b\b\b\b\b\b", tests_benchiters, time_per_iter * tmul, timeunit, passed_time * ttmul, ttimeunit);
+	printf("\b\b\b\b\b\b\b\b%.*s" TERMYELLOW "%dx " TERMBLUE "%04.0f %s/iter" TERMRESET " " TERMBLUEBG " %04.0f %s " TERMRESET, tests_benchiters < 10 ? 1 : tests_benchiters < 100 ? 2 : tests_benchiters < 1000 ? 3 : tests_benchiters < 10000 ? 4 : tests_benchiters < 100000 ? 5 : tests_benchiters < 1000000 ? 6 : tests_benchiters < 10000000 ? 7 : tests_benchiters < 100000000 ? 8 : tests_benchiters < 1000000000 ? 9 : 10, "\b\b\b\b\b\b\b\b\b\b\b\b", tests_benchiters, time_per_iter * tmul, timeunit, passed_time * ttmul, ttimeunit);
 	return 0;
 }
 
@@ -281,7 +290,7 @@ int TESTCONCAT(test_, N)(void) {\
 	tests_starttime = get_precise_time();\
 	TESTCONCAT(test_internal_, N)();\
 	if(assert_aborted == 1) { puts(""); assert_aborted = 0; return 1; }\
-	long double passed_time = (get_precise_time() - tests_starttime); /* Measures the amount of clocks the test took*/\
+	double passed_time = (double) (get_precise_time() - tests_starttime) / tests_clocks_per_sec; /* Measures the amount of clocks the test took*/\
 	tests_totaltime += passed_time;\
 	double tmul = 1000.0;\
 	char* timeunit = "ms";\
@@ -289,12 +298,12 @@ int TESTCONCAT(test_, N)(void) {\
 	else if(passed_time < 9.9e-3) tmul = 1000000.0, timeunit = "\u03BCs";\
 	if(!subtests_run)\
 		if(asserts < 12)\
-			printf("%.*s"TERMGREENBOLD"%.*s"TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0Lf %s "TERMRESET"\n", asserts * 2,\
+			printf("%.*s"TERMGREENBOLD"%.*s"TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s "TERMRESET"\n", asserts * 2,\
 				"\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b", asserts * 4,\
 				"\u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 \u2713 ",\
 				passed_time * tmul, timeunit);/* If this was a straight test with no subtests, just print out test passed message*/\
 		else\
-			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0Lf %s " TERMRESET "\n",\
+			printf("%.*s\b\b\b\b" TERMYELLOW "%dx " TERMGREENBOLD "\u2713 "TERMRESET TERMGREENBGBLACK" PASS "TERMRESET" "TERMBLUEBG" %04.0f %s " TERMRESET "\n",\
 			/*Length of the number in `assert`*/ asserts < 10 ? 1 : asserts < 100 ? 2 : asserts < 1000 ? 3 : asserts < 10000 ? 4 : asserts < 100000 ? 5 : asserts < 1000000 ? 6 : asserts < 10000000 ? 7 : asserts < 100000000 ? 8 : asserts < 1000000000 ? 9 : 10,\
 			"\b\b\b\b\b\b\b\b\b\b\b\b", asserts, passed_time * tmul, timeunit);\
 	else {\

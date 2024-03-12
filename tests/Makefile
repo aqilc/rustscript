@@ -17,15 +17,16 @@ ifeq ($(OS),Windows_NT)
 	STUPIDUNIXSHIT := 
 	
 	CC := clang-cl
-	CFLAGS := /O2 /Zi -I"../lib" /I"../deps/include"
+	CFLAGS := /O2 /Zi /I"../lib" /I"../deps/include"
 	COMPILEFLAG := /c
-	TCFLAGS := /O2 /Zi -I"../lib" /I"../deps/include"
+	TCFLAGS := /O2 /Zi /I"../lib" /I"../deps/include"
 	EXENAME := /Fe
 	OBJEND := .obj
 	OUTPUTFILENAME := /Fo
 	LINK := /link /DEBUG:FULL
 
-	# CC := gcc
+	# CC := clang
+	# COMPILEFLAG := -c 
 	# CFLAGS := -O3 -g -I"../lib" -I"../deps/include"
 	# TCFLAGS := -O3 -g -I"../lib" -I"../deps/include"
 	# EXENAME := -o

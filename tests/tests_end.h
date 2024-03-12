@@ -2,6 +2,10 @@
 
 int main() {
 	#ifdef _WIN32
+		LARGE_INTEGER f;
+		QueryPerformanceFrequency(&f);
+		tests_clocks_per_sec = f.QuadPart;
+
 		// So we can display unicode... windows rly took an L here ngl
 		SetConsoleOutputCP(65001);
 
@@ -9,6 +13,14 @@ int main() {
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
 		if(GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
 			testoutputwidth = csbi.srWindow.Right - csbi.srWindow.Left + 1 - 17 /* width of " PASS " + timing */;
+	#else
+		// tests_clocks_per_sec = CLOCKS_PER_SEC;
+		tests_clocks_per_sec = 1e9;
+
+		// https://stackoverflow.com/questions/23369503/how-to-get-the-terminal-size-in-c
+		struct winsize w;
+		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+		testoutputwidth = w.ws_col - 17 /* width of " PASS " + timing */;
 	#endif
 
 	#ifndef STOP_CATCHING_SIGNALS
