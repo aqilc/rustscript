@@ -285,7 +285,7 @@ static inline _Bool benchend_() {
 #define TEST_(name, N) \
 static inline void TESTCONCAT(test_internal_, N)(void);\
 int TESTCONCAT(test_, N)(void) {\
-	asserts = 0;\
+	assert_aborted = asserts = 0;\
 	printf(TERMCYANBOLD "%d)" TERMRESET " " name " " TERMGRAY "(" __FILE__ ":" TOSTRING(__LINE__) ")" TERMRESET " %-*s" TERMRESET, N + 1, (int) (TESTNAMELIMIT - sizeof(name " (" __FILE__ ":" TOSTRING(__LINE__) ")") + 1 - 3), "");\
 	tests_starttime = get_precise_time();\
 	TESTCONCAT(test_internal_, N)();\
