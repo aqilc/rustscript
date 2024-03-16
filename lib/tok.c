@@ -1,7 +1,9 @@
+#include <stdlib.h>
+
+#define VEC_H_STATIC_INLINE
 #include <vec.h>
 #include <hash.h>
 #include "util.h"
-#include "error.h"
 #include "tok.h"
 
 ht(char*, RS_TokenType) keywords;
@@ -14,9 +16,12 @@ hentry(keywords) keywordinit[] = {
 	{ "return", TT_KRETURN },
 	{ "trait",  TT_KTRAIT  },
 	
+	{ "bool",   TT_TBOOL   },
+	{ "u64",    TT_TU64    },
 	{ "u32",    TT_TU32    },
 	{ "u16",    TT_TU16    },
 	{ "u8",     TT_TU8     },
+	{ "i64",    TT_TI64    },
 	{ "i32",    TT_TI32    },
 	{ "i16",    TT_TI16    },
 	{ "i8",     TT_TI8     },
@@ -46,33 +51,54 @@ RS_Token* tokenize(char* str) {
 	
 	// Sets up keyword search
 	if(!keywords.n)
-		hmergeentries(keywords, keywordinit);
+		hmerge_entries(keywords, keywordinit);
 	
 	char* start = str;
 	RS_Token* ret = vnew();
 
 	#define op(t, l) vpush(ret, { .type = t, .len = l, .data = NULL, .place = str - start })//, printf("Op %s, %d\n", str, t)
-	#define error(...) { vpush(ret, { .type = TT_ERROR, .len = 0, .data = NULL, .place = str - start }); error_at(start, str - start, __VA_ARGS__); return ret; }
+	#define error(str) { vpush(ret, { .type = TT_ERROR, .len = 0, .data = str, .place = str - start }); return ret; }
+
+	bool dot = false;
+	bool plus = false;
+	bool minus = false;
 
 	u32 point = 0;
 	while ((point = utf8((u8**) &str))) {
 		char* tokstart = str;
 		
-		// Floats not supported yet
-		if(num(point)) {
-			char* lasttok = str;
-			while (num((point = utf8((u8**) &str)))) lasttok = str;
+		if(point == ' ' || point == '\n' || point == '\t' || point == '\r') continue;
 
-			u32 len = str - tokstart + !point; // Weird behavior at the end of strings
-			char* num = malloc(len + 1);
-			num[len] = 0;
-			memcpy(num, str - len - !!point, len); // ^^^^^^^^^^^^
-			
-			vpush(ret, { .data = num, .type = TT_INT, .place = str - start, .len = len });\
-			if(str[0] == '.') error("Floats are not available yet!");
+		if(num(point)) {
+			int64_t intv = 0;
+			if(minus) intv = -0;
+			if(plus) plus = false;
+			if(dot) goto float_parse;
+
+			// Read in integer/front part of float
+			char* lasttok = str;
+			while (num((point = utf8((u8**) &str))))
+				lasttok = str, intv = intv * 10 + (point - '0');
+
+			if(point == '.') {
+			float_parse:;
+				double floatv = (double) intv;
+				double dec = 0.1;
+
+				while (num((point = utf8((u8**) &str))))
+					lasttok = str, floatv += (point - '0') * (dec *= 0.1);
+
+				if(lasttok == str) error("Expected digit after decimal point");
+				vpush(ret, { .floatv = floatv, .type = TT_FLOAT, .place = str - start, .len = str - tokstart + !point });
+			}
+			else vpush(ret, { .intv = intv, .type = TT_INT, .place = str - start, .len = str - tokstart + !point });
 			str = lasttok;
 			continue;
 		}
+		else if(dot) { dot = false; op(TT_OPDOT, 1); }
+		else if(plus) { plus = false; op(TT_OPADD, 1); }
+		else if(minus) { minus = false; op(TT_OPSUB, 1); }
+		
 
 		if(alpha(point)) {
 			char* lasttok = str;
@@ -120,15 +146,13 @@ RS_Token* tokenize(char* str) {
 		case ';': op(TT_PSEMICOLON, 1); continue;
 		case ',': op(TT_PCOMMA, 1); continue;
 		case ':': op(TT_OPCOLON, 1); continue;
-		case '.': op(TT_OPDOT, 1); continue;
+		case '.': dot = true; continue;
 		}
 
 		char* tokstart2 = str;
 		u32 peek = utf8((u8**) &str);
 		RS_TokenType t = 0;
 		switch(point) {
-		case '+': if (peek == '+') { op(TT_OPINCR, 2); continue; } else t = TT_OPADD; break;
-		case '-': if (peek == '-') { op(TT_OPDECR, 2); continue; } else t = TT_OPSUB; break;
 		case '*': if (peek == '*') { op(TT_OPPOW, 2); continue; } else t = TT_OPMUL; break;
 		case '/': t = TT_OPDIV; break;
 		case '%': t = TT_OPMOD; break;
@@ -136,6 +160,19 @@ RS_Token* tokenize(char* str) {
 		case '&': if (peek == '&') { op(TT_LAND, 2); continue; } else t = TT_OPBAND; break;
 		case '^': t = TT_OPBXOR; break;
 		case '~': t = TT_OPBNOT; break;
+
+		case '+':
+			if (peek == '+') op(TT_OPINCR, 2);
+			else if(peek == '=') op(TT_OPADDSET, 2);
+			else if(vlen(ret) && isop(vlast(ret)->type)) plus = true;
+			else op(TT_OPADD, 1);
+			continue;
+		case '-':
+			if (peek == '-') op(TT_OPDECR, 2);
+			else if(peek == '=') op(TT_OPSUBSET, 2);
+			else if(vlen(ret) && isop(vlast(ret)->type)) minus = true;
+			else op(TT_OPSUB, 1);
+			continue;
 		}
 
 		if(t && peek == '=') { op(t + TT_OPADDSET - TT_OPADD, 2); continue; }
