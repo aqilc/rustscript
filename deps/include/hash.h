@@ -50,9 +50,9 @@ struct GENERIC_TABLE_ {
 #define hsetst(htb, ...) mayberesize(htb), *(hvalt(htb)*) htset((struct GENERIC_TABLE_*) &(htb), &(hkeyt(htb)) __VA_ARGS__, sizeof(**(htb).keys), sizeof(*(htb).items->v), false)
 #define hsets(htb, key) mayberesize(htb), *(hvalt(htb)*) htset((struct GENERIC_TABLE_*) &(htb), key, strlen(key) + 1, sizeof(*(htb).items->v), true)
 
-#define hsetcpys(str, htb, ...) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), (hkeyt(htb)*) &__VA_ARGS__, sizeof(**(htb).keys), strlen(str), false), str)
-#define hsetstcpys(str, htb, ...) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), &(hkeyt(htb)) __VA_ARGS__, sizeof(**(htb).keys), strlen(str), false), str)
-#define hsetscpys(str, htb, key) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), key, strlen(key) + 1, strlen(str) + 1, true), str)
+#define hset_strcpy(str, htb, ...) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), (hkeyt(htb)*) &__VA_ARGS__, sizeof(**(htb).keys), strlen(str), false), str)
+#define hsetst_strcpy(str, htb, ...) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), &(hkeyt(htb)) __VA_ARGS__, sizeof(**(htb).keys), strlen(str), false), str)
+#define hsets_strcpy(str, htb, key) mayberesize(htb), strcpy((char*) htset((struct GENERIC_TABLE_*) &(htb), key, strlen(key) + 1, strlen(str) + 1, true), str)
 
 #define hfree(htb) htfree((struct GENERIC_TABLE_*) &(htb))
 #define hreset(htb) htreset((struct GENERIC_TABLE_*) &(htb))
@@ -72,18 +72,18 @@ struct GENERIC_TABLE_ {
   for(unsigned int i = 0; i < sizeof(htinitarr) / htinitarr[0]; i++)\
     _Generic(**(htb).keys,\
       char*: _Generic(*(htb).items->v,\
-        char*: (hsetscpys(htinitarr[i].item, htb, htinitarr[i].key)),\
+        char*: (hsets_strcpy(htinitarr[i].item, htb, htinitarr[i].key)),\
         default: (hsets(htb, htinitarr[i].key) = htinitarr[i].item)\
       ),\
       default: Generic(*(htb).items->v,\
-        char*: (hsetcpys(htinitarr[i].item, htb, htinitarr[i].key)),\
+        char*: (hset_strcpy(htinitarr[i].item, htb, htinitarr[i].key)),\
         default: (hset(htb, htinitarr[i].key) = htinitarr[i].item)\
       )\
     );\
 } while(0)
 */
 
-#define haddentries(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
+#define hadd_entries(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
   htinit((struct GENERIC_TABLE_*) &(htb), sizeof(htinitarr));\
   for(unsigned int i = 0; i < sizeof(htinitarr) / sizeof(htinitarr[0]); i++)\
     _Generic(**(htb).keys,\
@@ -92,16 +92,16 @@ struct GENERIC_TABLE_ {
     );\
 } while(0)
 
-#define haddentriescpys(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
+#define hadd_entries_strcpy(htb, ...) do { HTINITIALIZER_(htb) = __VA_ARGS__;\
 	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(htinitarr));\
 	for(unsigned int i = 0; i < sizeof(htinitarr) / sizeof(htinitarr[0]); i++)\
 		_Generic(**(htb).keys,\
-			char*: (hsetscpys(htinitarr[i].item, htb, htinitarr[i].key)),\
-			default: (hsetcpys(htinitarr[i].item, htb, htinitarr[i].key))\
+			char*: (hsets_strcpy(htinitarr[i].item, htb, htinitarr[i].key)),\
+			default: (hset_strcpy(htinitarr[i].item, htb, htinitarr[i].key))\
 		);\
 } while(0)
 
-#define hmergeentries(htb, entries) do {\
+#define hmerge_entries(htb, entries) do {\
 	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(entries));\
 	for(unsigned int i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)\
 		_Generic(**(htb).keys,\
@@ -110,12 +110,12 @@ struct GENERIC_TABLE_ {
 		);\
 } while(0)
 
-#define hmergeentriescpys(htb, entries) do {\
+#define hmerge_entries_strcpy(htb, entries) do {\
 	htinit((struct GENERIC_TABLE_*) &(htb), sizeof(entries));\
 	for(unsigned int i = 0; i < sizeof(entries) / sizeof(entries[0]); i++)\
 		_Generic(**(htb).keys,\
-			char*: (hsetscpys(entries[i].item, htb, entries[i].key)),\
-			default: (hsetcpys(entries[i].item, htb, entries[i].key))\
+			char*: (hsets_strcpy(entries[i].item, htb, entries[i].key)),\
+			default: (hset_strcpy(entries[i].item, htb, entries[i].key))\
 		);\
 } while(0)
 
