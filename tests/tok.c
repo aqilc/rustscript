@@ -27,9 +27,9 @@ TEST("Tokenize integers: '1234567890 1234'") {
 	RS_Token* tok = tokenize(str);
 	asserteq(tok[0].type, TT_INT);
 	asserteq(tok[0].len, 10);
-	assertstreq(tok[0].data, "1234567890");
+	asserteq(tok[0].intv, 1234567890);
   asserteq(tok[1].type, TT_INT);
-	assertstreq(tok[1].data, "1234");
+	asserteq(tok[1].intv, 1234);
   asserteq(tok[2].type, TT_EOF);
 	freetoks(tok);
 }
