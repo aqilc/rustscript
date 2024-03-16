@@ -70,7 +70,7 @@ RS_Token* tokenize(char* str) {
 		if(point == ' ' || point == '\n' || point == '\t' || point == '\r') continue;
 
 		if(num(point)) {
-			int64_t intv = 0;
+			int64_t intv = point - '0';
 			if(minus) intv = -0;
 			if(plus) plus = false;
 			if(dot) goto float_parse;
@@ -223,6 +223,6 @@ RS_Token* tokenize(char* str) {
 
 void freetoks(RS_Token* tok) {
 	for(u32 i = 0; i < vlen(tok); i ++)
-		if(tok[i].data) free(tok[i].data);
+		if(tok[i].type == TT_STRING || tok[i].type == TT_IDENT) free(tok[i].data);
 	vfree(tok);
 }
