@@ -65,7 +65,7 @@ TESTSUITE := tests.h tests_end.h
 
 
 
-all: tok asm
+all: tok asm parse
 
 clean:
 	$(FILEDELETE) *.o
@@ -86,36 +86,56 @@ asm: asm$(EXEEND)
 	@$(STUPIDUNIXSHIT)asm$(EXEEND)
 # @C:\Windows\system32\cmd.exe /C "echo."
 
+parse: parse$(EXEEND)
+	@echo Running '$^'
+	@$(STUPIDUNIXSHIT)parse$(EXEEND)
+
 .PHONY: all tok clean
 
 
 
 # ============== Test bins ==============
-tok$(EXEEND): toktest$(OBJEND) tok$(OBJEND) error$(OBJEND) $(UTIL)
+tok$(EXEEND): toktest$(OBJEND) tok$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-asm$(EXEEND): asmtest$(OBJEND) asm$(OBJEND) error$(OBJEND) $(UTIL)
+asm$(EXEEND): asmtest$(OBJEND) asm$(OBJEND)
+	@$(CC) $^ $(EXENAME)$@ $(LINK)
+
+parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 # ============= Test Builds =============
 toktest$(OBJEND): tok.c ../lib/tok.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c $(TESTSUITE)
+asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-# ----------- Base lib builds -----------
-hashfunc$(OBJEND): ../deps/hashfunc.c
+parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
+	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+# ----------- Base lib builds ------------
+
+%$(OBJEND): ../deps/%.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-codegen$(OBJEND): ../lib/codegen.c
+%$(OBJEND): ../lib/%.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
-tok$(OBJEND): ../lib/tok.c
-	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
-error$(OBJEND): ../lib/error.c
-	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
-asm$(OBJEND): ../lib/asm/asm_x86.c
-	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+# hashfunc$(OBJEND): ../deps/hashfunc.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+# codegen$(OBJEND): ../lib/codegen.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+# tok$(OBJEND): ../lib/tok.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+# error$(OBJEND): ../lib/error.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+# asm$(OBJEND): ../lib/asm/asm_x86.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+# parse$(OBJEND): ../lib/parse.c
+# 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 # coderun$(OBJEND): ../lib/asm/coderun.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 # backend_load$(OBJEND): ../../backend_load.c
