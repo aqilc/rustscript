@@ -98,10 +98,10 @@ parse: parse$(EXEEND)
 tok$(EXEEND): toktest$(OBJEND) tok$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-asm$(EXEEND): asmtest$(OBJEND) asm$(OBJEND)
+asm$(EXEEND): asmtest$(OBJEND) asm_x86$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) hashfunc$(OBJEND)
+parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) tok$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 # ============= Test Builds =============
@@ -121,6 +121,10 @@ parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
 
 %$(OBJEND): ../lib/%.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+%$(OBJEND): ../lib/asm/%.c
+	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
 
 # hashfunc$(OBJEND): ../deps/hashfunc.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
