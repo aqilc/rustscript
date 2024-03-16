@@ -64,3 +64,4 @@ main*.idx
 main*.run
 initOpen.txt
 tests/asm/
+gabe_*
