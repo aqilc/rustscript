@@ -6,9 +6,15 @@
 #include <hash.h>
 
 TEST("\"return 0;\"") {
-	RS_MachineResult res = x86_machine(parse("test1.rc", "return 0;"));
+	struct RS_ParserState* state = parse("test2.rc", "return 0;");
+	assert(state != NULL);
+
+	RS_MachineResult res = x86_machine(state);
+	char* str = x86_asm(state);
+
 	asserteq(res.len, 8);
 	assertmemeq(res.code, { 0x48, 0xC7, 0xC0, 0x00, 0x00, 0x00, 0x00, 0xC3 });
+	assertstreq(str, "\tmov rax, 0\n\tret");
 }
 
 #include "tests_end.h"
