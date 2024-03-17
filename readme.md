@@ -9,17 +9,17 @@ This syntax is the current goal:
 ```rust
 struct Datatype { // Syntax is similar to JS classes, but more concise and requires types.
 	number: u32 = 0; // Optionals and defaults in-built.
-	string: str; // Only stores length and capacity with extremely transparent and simple logic and easy conversion to C string.
+	string: string; // Only stores length and capacity with extremely transparent and simple logic and easy conversion to C string.
 	array: u32[]; // All arrays are variable size, contain the same things as strings.
-	object: { [key: str]: str }; // or record<str, str>
+	object: { [key: string]: string }; // or record<string, string>
 	object2: {
-		hi: str,
+		hi: string,
 		[2]: bool // Unlike in Typescript, number keys are possible
 	}; // { ... } type declarations are treated as records, not Structs. If you want to make a struct you have to define it with `struct x {}`.
 	optional?: *Database; // Option types can only be pointers. Type recursion can only be done with pointers.
 
 	// Struct methods
-	print() => print("hello, this is ${this.string}")
+	print() => print("hello ${this.string}")
 	static hi() => "something"
 }
 
@@ -33,13 +33,13 @@ const obj = {
 
 Datatype {
 	object2: {
-		hi: false, // ERROR: Property "hi" expected to be of type str but is assigned to a boolean!
+		hi: false, // ERROR: Property "hi" expected to be of type string but is assigned to a boolean!
 	} // ERROR: Property "2" needs to be defined!
 }; // ERROR: Need to define `string`, `array` and `object`!
 	
 const d = Datatype {
 	number: 4,
-	string: "hi",
+	string: "world",
 	array: [1, 0],
 	object: {
 		hi: "syntax inside of objects is just like structs"
@@ -50,7 +50,8 @@ const d = Datatype {
 	}
 }
 
-print(d.number == 4, d.string.len == 2, d.array.len == 2, d.object.has("hi")); // All true.
+d.print(); // "hello world"
+print(d.number == 4, d.string.len == 2, d.array.len == 2, "hi" in d.object); // All true.
 
 
 // ? in front of any type creates an option type, would take no extra memory for pointers.
@@ -69,21 +70,30 @@ const ez2 = () => 1;
 
 ### Syntax TODO
 
-- [ ] `fn main() => 0;`
+- [x] `return 0;`
 	- [x] Basic Tokenizing
-	- [ ] Basic Code Generation and execution
-		- [x] Start working on custom Assembler library
+	- [x] Basic AST generation
+	- [x] Basic Code Generation and execution
+  	- [x] x86 Code Generation
+    	- [x] AST Iteration
+    	- [x] Statement -> Assembly
+		- [x] Custom Assembler library
   		- [x] Assemble Basic instructions like `push rax`
-  		- [-] Prefixes
-  		- [ ] Hints
+  		- [x] Prefixes
+  		- [x] Hints
   		- [ ] Vector EXtension Instructions
     		- [ ] EVEX
-- [ ] `fn main() => 1 + 1;`
-	- [ ] Expression Parsing
+- [ ] `return 1 + 1;`
+	- [x] Expression Parsing
 		- [ ] Order of Operations
 		- [ ] Unary Operators
 		- [ ] Comma
-- [ ] `fn main() { print("lol") }`
+  - [ ] x86 Code Generation
+    - [ ] Expression iteration and emitting appropriate instructions
+- [ ] `print("lol");`
+	- [ ] Function Calls
+	- [ ] Linking to the C library / externally defined functions.
+- [ ] `fn main() { return 0; } return main();`
 	- [ ] Function Calls
 	- [ ] Linking to the C library / externally defined functions.
 

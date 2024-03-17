@@ -17,9 +17,9 @@ ifeq ($(OS),Windows_NT)
 	STUPIDUNIXSHIT := 
 	
 	CC := clang-cl
-	CFLAGS := /O2 /Zi /I"../lib" /I"../deps/include"
+	CFLAGS := /Od /Zi /I"../lib" /I"../deps/include"
 	COMPILEFLAG := /c
-	TCFLAGS := /O2 /Zi /I"../lib" /I"../deps/include"
+	TCFLAGS := /Od /Zi /I"../lib" /I"../deps/include"
 	EXENAME := /Fe
 	OBJEND := .obj
 	OUTPUTFILENAME := /Fo
@@ -65,7 +65,7 @@ TESTSUITE := tests.h tests_end.h
 
 
 
-all: tok asm parse
+all: tok asm parse x86
 
 clean:
 	$(FILEDELETE) *.o
@@ -90,7 +90,11 @@ parse: parse$(EXEEND)
 	@echo Running '$^'
 	@$(STUPIDUNIXSHIT)parse$(EXEEND)
 
-.PHONY: all tok clean
+x86: x86$(EXEEND)
+	@echo Running '$^'
+	@$(STUPIDUNIXSHIT)x86$(EXEEND)
+
+.PHONY: all tok asm parse x86 clean
 
 
 
@@ -104,6 +108,9 @@ asm$(EXEEND): asmtest$(OBJEND) asm_x86$(OBJEND)
 parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) tok$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
+x86$(EXEEND): x86test$(OBJEND) x86$(OBJEND) asm_x86$(OBJEND) tok$(OBJEND) parse$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
+	@$(CC) $^ $(EXENAME)$@ $(LINK)
+
 # ============= Test Builds =============
 toktest$(OBJEND): tok.c ../lib/tok.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
@@ -112,6 +119,9 @@ asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
+	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+x86test$(OBJEND): x86.c ../lib/backends/x86.c ../lib/backends/x86.h ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h ../lib/parse.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # ----------- Base lib builds ------------
@@ -125,6 +135,8 @@ parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
 %$(OBJEND): ../lib/asm/%.c
 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
+%$(OBJEND): ../lib/backends/%.c
+	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # hashfunc$(OBJEND): ../deps/hashfunc.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<

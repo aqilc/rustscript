@@ -5,9 +5,6 @@
 #undef IN
 #undef INT
 #undef OUT
-// #define VEC_H_IMPLEMENTATION
-// #include <vec.h>
-#include <string.h>
 #include <asm/asm_x86.h>
 
 int instructionlen;
@@ -39,7 +36,7 @@ TEST("Assemble push instructions (1 argument, with optional REX and Addressing O
 	INSTESTMEMEQ(0x41, 0x50);
 }
 
-TEST("Assemble call instructions (1 argument, with optional REX and Immediates)") {
+TEST("Assemble call/jmp instructions (1 argument, with optional REX and Immediates)") {
 	char buf[7] = {0};
 
 	INSTEST(0xFF 0xD0, CALL, rax);
