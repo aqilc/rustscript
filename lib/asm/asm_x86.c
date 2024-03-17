@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <util.h>
 #include "asm_x86.h"
+#include <util.h>
 
 // https://github.com/StanfordPL/x64asm
 
@@ -20,6 +20,17 @@
  * - https://nixhacker.com/segmentation-in-intel-64-bit/
  * - https://stackoverflow.com/questions/58182616/assembler-use-of-segment-register
  * - https://stackoverflow.com/questions/41573502/why-doesnt-gcc-use-partial-registers
+ * - https://stackoverflow.com/questions/52522544/rbp-not-allowed-as-sib-base
+ * - https://blog.yossarian.net/2020/11/30/How-many-registers-does-an-x86-64-cpu-have
+ * - https://stackoverflow.com/a/54895495/10013227   # x86 instruction prefix decoding
+ * - https://www.cs.virginia.edu/~evans/cs216/guides/x86.html # instruction guide, handy
+ * - https://www.cs.put.poznan.pl/tzok/public/cawllp-04-asm.html#:~:text=default%20rel%20instructs%20to%20use,16%2D%20or%2032%2Dbit%20number # Various examples
+ * - https://www.felixcloutier.com/x86/ # x86 instruction set reference
+ * - https://learn.microsoft.com/en-us/cpp/cpp/argument-passing-and-naming-conventions?view=msvc-170
+ * - https://wiki.osdev.org/Calling_Conventions
+ * - https://chromium.googlesource.com/v8/v8.git/+/refs/heads/main/src/codegen/x64/assembler-x64.h # V8's x64 assembler
+ * - https://zhu45.org/posts/2017/Jul/30/understanding-how-function-call-works/#google_vignette
+ * - https://www.computerenhance.com/p/how-does-queryperformancecounter
  */
 
 /**
@@ -76,7 +87,7 @@ static inline x64LookupActualIns* identify(x64Ins* ins) {
 		for(u32 j = 0; j < actual->arglen; j ++)
 			if(!(actual->args[j] & insoperands[j])) { match = false; break; }
 			else if(resolved && (
-					resolved->args[j] < (actual->args[j] & insoperands[j]) ||
+					resolved->args[j] < (actual->args[j] & insoperands[j]) || // Generally, more specific arguments have a higher set bit than less specific ones.
 					resolved->oplen + resolved->preflen + !!resolved->pref66 > actual->oplen + actual->preflen + !!actual->pref66 ||
 					(resolved->modrmreq && !actual->modrmreq))) morespecific = true;
 		if(!match || (preferred && !actual->preffered)) continue;
@@ -122,7 +133,6 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 	
 	// 67H prefix - Prefix group 4 - GCC Ordering
 	if(res->mem_operand && (ins->params[res->mem_operand - 1].value & ((u64) 0x1 << 60)))
-		// printf("Actual value: %llX", ins->params[res->mem_operand - 1].value),
 		*opcode_dest = 0x67, opcode_dest ++;
 
 	// Only for Normal **NON** VEX and EVEX instructions
@@ -153,15 +163,10 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 	memcpy(opcode_dest, res->opcode, res->oplen);
 	opcode_dest += res->oplen;
 
-	// if(ins->op == MOVQ)
-		// printf("hello?? why isn't modrmreq true for MOVQ? %d for '%s'\n", res->modrmreq, res->orig_ins);
-
 	// ModR/M | MOD = XX, REG = XXX, RM = XXX | https://wiki.osdev.org/X86-64_Instruction_Encoding#:~:text=r/m-,32/64%2Dbit%20addressing,-These%20are%20the
 	if(res->modrmreq) {
 		u8 modrm = res->modrm;
 		x64Operand* rm = ins->params + res->mem_operand - 1;
-
-		// printf("value: 0x%llX", rm->value);
 
 		if (res->modrmreg)
 			modrm |= (ins->params[res->reg_operand - 1].value & 0x7) << 3;
@@ -212,7 +217,6 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 
 	// For instructions that have +rw, +rd etc
 	else if(res->reg_operand)
-		// printf("reg operand: %d, value: %lld", res->reg_operand, ins->params[res->reg_operand - 1].value),
 		*(opcode_dest - 1) |= (ins->params[res->reg_operand - 1].value & 0x7);
 
 end:
@@ -237,16 +241,16 @@ static const char* reg_stringify(x64Operand* reg) {
 	if(reg->type & R16) return ((const char*[]){ "ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "bp", "sp", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" })[reg->value];
 	if(reg->type & R32) return ((const char*[]){ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" })[reg->value];
 	if(reg->type & R64) return ((const char*[]){ "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" })[reg->value];
-	if(reg->type & MM) return ((const char*[]){ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" })[reg->value];
 	if(reg->type & XMM) return ((const char*[]){ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15", "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22", "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29", "xmm30", "xmm31" })[reg->value];
 	if(reg->type & YMM) return ((const char*[]){ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15", "ymm16", "ymm17", "ymm18", "ymm19", "ymm20", "ymm21", "ymm22", "ymm23", "ymm24", "ymm25", "ymm26", "ymm27", "ymm28", "ymm29", "ymm30", "ymm31" })[reg->value];
 	if(reg->type & ZMM) return ((const char*[]){ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31" })[reg->value];
+	if(reg->type & MM) return ((const char*[]){ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" })[reg->value];
 	if(reg->type & SREG) return ((const char*[]){ "es", "cs", "ss", "ds", "fs", "gs" })[reg->value];
 	if(reg->type & CR0_7) return ((const char*[]){ "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7" })[reg->value];
+	if(reg->type & CR8) return "cr8";
 	if(reg->type & DREG) return ((const char*[]){ "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7" })[reg->value];
 	if(reg->type & ST_0) return "st";
 	else if(reg->type & ST) return ((const char*[]){ "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)" })[reg->value];
-	if(reg->type & CR8) return "cr8";
 	return NULL;
 }
 
@@ -283,7 +287,7 @@ char* x64stringify(x64 p) {
 				cursize += 2;
 			}
 			if(p[curins].params[i].type & allregmask) {
-				char* reg = reg_stringify(p[curins].params + i);
+				const char* reg = reg_stringify(p[curins].params + i);
 				if(!reg) {
 					printf("Invalid register type: %llX", p[curins].params[i].type);
 					free(code);
@@ -301,8 +305,8 @@ char* x64stringify(x64 p) {
 					u32 segstr = sprintf(code + cursize, "%s:", reg_ref_stringify(((p[curins].params[i].value >> 48) & 0x7) - 1 + $es));
 					cursize += segstr;
 				}
-				u32 memstr = sprintf(code + cursize, "[");
-				cursize += memstr;
+				code[cursize] = '[';
+				cursize += 1;
 				if(p[curins].params[i].value & 0x2000000000000000) {
 					u32 memstr = sprintf(code + cursize, "rip + 0x%X", (u32) p[curins].params[i].value);
 					cursize += memstr;
@@ -350,6 +354,7 @@ char* x64stringify(x64 p) {
 char* x64as(x64 p, u32* len) {
 	char* code = malloc(14);
 	u32 ins = 0;
+	*len = 0;
 
 	while (p[ins].op) {
 		u32 curlen = x64emit(p + ins, code + *len);
