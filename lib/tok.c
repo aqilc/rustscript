@@ -6,6 +6,83 @@
 #include "util.h"
 #include "tok.h"
 
+char* toktostr[] = {
+	[TT_DNUOPSTART] = "",
+	[TT_OPSET] = "=",
+	[TT_OPADD] = "+",
+	[TT_OPSUB] = "-",
+	[TT_OPMUL] = "*",
+	[TT_OPDIV] = "/",
+	[TT_OPMOD] = "%",
+	[TT_OPPOW] = "^",
+	[TT_OPBXOR] = "^",
+	[TT_OPBOR] = "|",
+	[TT_OPBAND] = "&",
+	[TT_OPBSHIFTRIGHT] = ">>",
+	[TT_OPBSHIFTLEFT] = "<<",
+	[TT_OPADDSET] = "+=",
+	[TT_OPSUBSET] = "-=",
+	[TT_OPMULSET] = "*=",
+	[TT_OPDIVSET] = "/=",
+	[TT_OPMODSET] = "%=",
+	[TT_OPPOWSET] = "^=",
+	[TT_OPBXORSET] = "^=",
+	[TT_OPBORSET] = "|=",
+	[TT_OPBANDSET] = "&=",
+	[TT_OPBSHIFTRIGHTSET] = ">>=",
+	[TT_OPBSHIFTLEFTSET] = "<<=",
+	[TT_OPBNOT] = "~",
+	[TT_OPDOT] = ".",
+	[TT_OPQUESDOT] = "?.",
+	[TT_OPQUES] = "?",
+	[TT_OPINCR] = "++",
+	[TT_OPDECR] = "--",
+	[TT_DNUOPEND] = "",
+	[TT_POPENCBR] = "{",
+	[TT_PCLOSECBR] = "}",
+	[TT_POPENPAR] = "(",
+	[TT_PCLOSEPAR] = ")",
+	[TT_POPENSQBR] = "[",
+	[TT_PCLOSESQBR] = "]",
+	[TT_PARROW] = "->",
+	[TT_PCOMMA] = ",",
+	[TT_PCOLON] = ":",
+	[TT_PSEMICOLON] = ";",
+	[TT_LAND] = "&&",
+	[TT_LOR] = "||",
+	[TT_LTERNARY] = "?",
+	[TT_LNOT] = "!",
+	[TT_CGREATER] = ">",
+	[TT_CLESS] = "<",
+	[TT_CEQ] = "==",
+	[TT_CGREATEQ] = ">=",
+	[TT_CLESSEQ] = "<=",
+	[TT_CNOTEQ] = "!=",
+	[TT_KRETURN] = "return",
+	[TT_KLET] = "let",
+	[TT_KCONST] = "const",
+	[TT_KIF] = "if",
+	[TT_KELSE] = "else",
+	[TT_KFN] = "fn",
+	[TT_KSTRUCT] = "struct",
+	[TT_KTRAIT] = "trait",
+	[TT_TU8] = "u8",
+	[TT_TU16] = "u16",
+	[TT_TU32] = "u32",
+	[TT_TU64] = "u64",
+	[TT_TI8] = "i8",
+	[TT_TI16] = "i16",
+	[TT_TI32] = "i32",
+	[TT_TI64] = "i64",
+	[TT_TBOOL] = "bool",
+	[TT_IDENT] = "",
+	[TT_INT] = "",
+	[TT_FLOAT] = "",
+	[TT_STRING] = "",
+	[TT_EOF] = "",
+	[TT_ERROR] = "",
+};
+
 ht(char*, RS_TokenType) keywords;
 hentry(keywords) keywordinit[] = {
 	{ "let",    TT_KLET    },
@@ -145,7 +222,7 @@ RS_Token* tokenize(char* str) {
 		case ']': op(TT_PCLOSESQBR, 1); continue;
 		case ';': op(TT_PSEMICOLON, 1); continue;
 		case ',': op(TT_PCOMMA, 1); continue;
-		case ':': op(TT_OPCOLON, 1); continue;
+		case ':': op(TT_PCOLON, 1); continue;
 		case '.': dot = true; continue;
 		}
 
