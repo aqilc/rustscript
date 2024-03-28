@@ -74,6 +74,8 @@ clean:
 	$(FILEDELETE) *.pdb
 	$(FILEDELETE) *.obj
 	$(FILEDELETE) *.ilk
+	$(FILEDELETE) *.raddbg
+	$(FILEDELETE) *.idx
 	$(FILEDELETE) gmon.out
 
 tok: tok$(EXEEND)
