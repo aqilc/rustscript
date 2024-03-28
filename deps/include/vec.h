@@ -70,14 +70,14 @@ struct vecdata_ {
 #define vpushv(x, y) (memcpy(vpush_((void**) &(x), _DATA(y)->used), y, _DATA(y)->used))
 
 // Add values to the beginning of the vec
-// #define vunshift(x, ...) (*(typeof(x))vunshift_((void**)&(x), sizeof(*(x))) = (typeof(*x)) __VA_ARGS__)
+#define vunshift(x, ...) (*(typeof(x))vunshift_((void**)&(x), sizeof(*(x))) = (typeof(*x)) __VA_ARGS__)
 
 // Simplifies vclear and vtostr calls
-#define vclear(v) vclear_((void**)&(v))
 #define vtostr(v) vtostr_((void**)&(v))
 
 // Pops off the last element and returns it
-#define vpop(x) vpop_((x), sizeof(*(x)))
+#define vpop(x) (_DATA(x)->data + (_DATA(x)->used -= sizeof(*(x))))
+// #define vpop(x) vpop_((x), sizeof(*(x)))
 
 // Removes data from the middle of the array
 #define vremove(x, idx) vremove_((x), sizeof(*(x)), (idx))
@@ -87,6 +87,9 @@ struct vecdata_ {
 
 // Prealloc more space before setting elements.
 #define vprealloc(x, n) vpush_((void**)&(x), sizeof(*(x)) * (n))
+
+// New vector initialized with a struct or array
+#define vecify(x) ((typeof(x))vnewn(sizeof(x)) = x)
 
 // V String that has length info and is automatically push-able
 typedef char* vstr;
@@ -104,7 +107,7 @@ VEC_H_EXTERN void vfree(void* v);
 VEC_H_EXTERN char vcmp(void* a, void* b);
 
 // Initialize a vector with a string straight away
-VEC_H_EXTERN char* strtov(char* s);
+// VEC_H_EXTERN char* strtov(char* s);
 VEC_H_EXTERN void  vempty(void* v);
 VEC_H_EXTERN char* vtostr_(void** v);
 VEC_H_EXTERN void  vremove_(void* v, uint32_t size, uint32_t pos);
@@ -191,7 +194,7 @@ VEC_H_EXTERN void vempty(void* v) { _DATA(v)->used = 0; }
 VEC_H_EXTERN void vfree(void* v) { VEC_H_FREE(_DATA(v)); }
 
 
-// Reallocs more size for the array, hopefully without moves o.o
+// Reallocs more size for the array, hopefully without moves
 #ifndef VEC_H_OVERLOAD_ALLOCATORS
 	#define VEC_H_REALLOC_FUNC alloc_
 	static inline void* alloc_(struct vecdata_* data, uint32_t size) {
@@ -237,17 +240,17 @@ VEC_H_EXTERN void vpushsf_(void** v, char* fmt, ...) {
 
 VEC_H_EXTERN void vpushn_(void** v, uint32_t n, uint32_t size, void* thing) {
 	char* place = VEC_INTERNAL_PUSH_NAME(v, n * size);
-	if(size == 1 || size == 4) memset(place, *((char*) thing), size);
+	if(size == 1) memset(place, *((char*) thing), size);
 	else for(uint32_t i = 0; i < n; i ++) memcpy(place + size * i, thing, size);
 }
 
-VEC_H_EXTERN void* vpop_(void* v, uint32_t size) { _DATA(v)->used -= size; return _DATA(v)->data + _DATA(v)->used; }
+// VEC_H_EXTERN void* vpop_(void* v, uint32_t size) { _DATA(v)->used -= size; return _DATA(v)->data + _DATA(v)->used; }
 
 // Adds an element at the start of the vector, ALSO CHANGES PTR
-// VEC_H_EXTERN void* vunshift_(void** v, uint32_t size) {
-// 	memmove((char*) (*v = alloc_(_DATA(*v), size)) + size, *v, _DATA(*v)->used);
-// 	return *v;
-// }
+VEC_H_EXTERN void* vunshift_(void** v, uint32_t size) {
+	memmove((char*) (*v = alloc_(_DATA(*v), size)) + size, *v, _DATA(*v)->used);
+	return *v;
+}
 
 // Deletes data from the middle of the array
 VEC_H_EXTERN void vremove_(void* v, uint32_t size, uint32_t pos) {
