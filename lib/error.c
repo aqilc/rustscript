@@ -75,7 +75,7 @@ void parser_message(char* str, u32 place, char* file, char* fmt, ...) {
 	// The error
 	va_list args;
 	va_start(args, fmt);
-	fprintf(stderr, "%s@%d:%d:", file, linenum, place - start);
+	fprintf(stderr, "%s@%d:%d: ", file, linenum, place - start);
 	vfprintf(stderr, fmt, args);
 	fprintf(stderr, "\n");
 
@@ -83,5 +83,5 @@ void parser_message(char* str, u32 place, char* file, char* fmt, ...) {
 	fprintf(stderr, "%d | %.*s\n", linenum, (u32) (start - end - 1), str + start);
 
 	// Prints out the spaces and then the ^
-	fprintf(stderr, "%*s|%*s\\033[31;1m^\\033[0m\n", linenumlen + 1, "", place - linenumlen - 2 - start, "");
+	fprintf(stderr, "%*s|%*s\033[31;1m^\033[0m\n", linenumlen + 1, "", place - linenumlen - 2 - start, "");
 }
