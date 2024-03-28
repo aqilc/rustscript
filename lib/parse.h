@@ -1,5 +1,6 @@
 #pragma once
 #include "util.h"
+#include <hash.h>
 #include <stdbool.h>
 #include "tok.h"
 typedef struct RS_Stmt RS_Stmt;
@@ -22,15 +23,27 @@ struct RS_Type {
 struct RS_FuncArg { RS_Type type; char* name; };
 typedef struct RS_FuncArg RS_FuncArg;
 
-enum RS_ExprT { EX_CALL, EX_REGULAR, EX_PRIM, EX_VAR };
+enum RS_ExprT { EX_CALL = 1, EX_REGULAR, EX_PRIM, EX_VAR };
 typedef enum RS_ExprT RS_ExprT;
 
-enum RS_StmtT { ST_EXPR, ST_DECLARE, ST_RETURN, ST_IF, ST_ELSE, ST_WHILE, ST_FUNC, ST_EOF };
+enum RS_StmtT { ST_EXPR = 1, ST_DECLARE, ST_RETURN, ST_IF, ST_ELSE, ST_WHILE, ST_FUNC, ST_EOF };
 typedef enum RS_StmtT RS_StmtT;
 
 
+
+struct RS_Variable {
+	bool vcons;
+	char* vname;
+	RS_Expr* value;
+}; // RS_Declare
+
+struct RS_Scope {
+	ht(char*, struct RS_Variable*) vars;
+};
+
+
 struct RS_Expr {
-	u32 tok; // TT_OPX
+	RS_Token* tok; // TT_OPX
 	RS_ExprT type;
 	union {
 		struct {
@@ -47,14 +60,8 @@ struct RS_Expr {
 
 
 struct RS_Stmt {
-	u32 tok; // TT_KX
 	RS_StmtT type;
 	union {
-		struct {
-			bool vcons;
-			char* vname;
-			RS_Expr* value;
-		}; // RS_Declare
 		struct {
 			RS_Expr* ret;
 		}; // RS_Return
@@ -68,6 +75,7 @@ struct RS_Stmt {
 		struct {
 			char* fname;
 			RS_FuncArg* fargs;
+			RS_Stmt* fvars;
 			RS_Stmt* fbody;
 		}; // RS_Func
 	};
@@ -78,6 +86,8 @@ struct RS_ParserState {
 	RS_Expr* expressions;
 	RS_Type* types;
 
+	RS_Stmt* scope;
+
 	char* file;
 	char* src;
 	RS_Token* toks;
@@ -87,4 +97,5 @@ struct RS_ParserState {
 typedef RS_Stmt* AST;
 
 struct RS_ParserState* parse(char* file, char* str);
+void debug_expr(RS_Expr* ex);
 // void free_ast(AST ast);

@@ -47,9 +47,9 @@ static void parse_stmt(struct x86State* st) {
 static void parse_expr(struct x86State* st, RS_Expr* node) {
 	switch(node->type) {
 		case EX_PRIM:
-			switch(st->st->toks[node->tok].type) {
+			switch(node->tok->type) {
 				case TT_INT:
-					vpush(st->code, (x64Ins) {MOV, rax, imm(st->st->toks[node->tok].intv)});
+					vpush(st->code, (x64Ins) {MOV, rax, imm(node->tok->intv)});
 					return;
 				default:
 					return;
