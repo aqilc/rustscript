@@ -28,4 +28,7 @@ const embed = Embed {
 ```
 
 	- Definitely can be better named.
-- 
+- Define "undefined" behavior like `i = i++;`
+- Optional Chaining using `?.`
+  - https://www.typescriptlang.org/docs/handbook/release-notes/typescript-3-7.html
+  - Would change the type of the resulting expression to `T?`

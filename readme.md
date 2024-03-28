@@ -63,9 +63,19 @@ if res {
 print("we can also unwrap types with ? like this: ${res?}")
 
 // Alternative function syntaxes (last one is technically what happens internally anyways)
-fn ez1() { 1 }
+fn ez1() { return 1 }
 fn ez1() => 1;
-const ez2 = () => 1;
+const ez1 = () => 1;
+
+fn func1(str: string) { return str; }
+fn func2({ hi: alias }: { hi: string } = { hi: "default" }) => alias
+fn func3(reg: Regex) => reg.exec("hi")
+
+func1("hi")
+func1 "hi"
+func2({ hi: "string" })
+func2 { hi: "string" }
+func3 /rand\w+/g
 ```
 
 ### Syntax TODO
