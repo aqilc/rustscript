@@ -16,7 +16,7 @@ double hi;
 	instructionlen = x64emit(&curins, buf);\
 	expectedinslen = sizeof(#bytes) / 5;\
 	asserteq(instructionlen, expectedinslen);
-#define INSTESTMEMEQ(...) assertmemeq(buf, { __VA_ARGS__ }); } SUBBENCH() { x64emit(&curins, buf); }
+#define INSTESTMEMEQ(...) assertbyteseq(buf, { __VA_ARGS__ }); } SUBBENCH() { x64emit(&curins, buf); }
 
 TEST("Assemble push instructions (1 argument, with optional REX and Addressing Overrides)") {
 	char buf[3] = {0};
@@ -111,7 +111,7 @@ TEST("Stringify instructions") {
 	SUB("Stringify MOV, {rax, rax} => mov rax, rax")
 		assertstreq(x64stringify((x64) { MOV, {rax, rax}, 0 }), "\tmov\trax, rax");
 
-	SUB("Stringify MOV, {rax, imm(0xABCDEF)} => mov rax, imm(0x1234567890ABCDEF)")
+	SUB("Stringify MOV, {rax, imm(0xABCDEF)} => mov rax, 0xABCDEF")
 		assertstreq(x64stringify((x64) { MOV, {rax, imm(0xABCDEF)}, 0 }), "\tmov\trax, 0xABCDEF");
 
 	SUB("Stringify MOV, {rax, mem($rax, 0xABCDEF, $r8, 2, $es)} => mov rax, es:[rax + r8 * 2 + 0xABCDEF]")

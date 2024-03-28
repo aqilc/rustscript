@@ -34,7 +34,7 @@
  * - 2.3.0 - Add a way to run a test without printing output, just to time or debug it.
  * - 2.0.0 - Add benchmarks.
  * - 2.0.0 beta2 - Move around includes.
- * - 1.0.0 - Add assertmemeq, assertstreq, and asserteq.
+ * - 1.0.0 - Add assertbyteseq, assertstreq, and asserteq.
  */
 
 
@@ -113,9 +113,6 @@ void init(void) __attribute__((weak));
 #define TESTNAMELIMIT testoutputwidth
 
 
-
-
-
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -189,16 +186,81 @@ char* tests_print_mem(void* mem, int size) {
 	return testtempbuf;
 }
 
+struct tests_memdiff_section {
+	unsigned int start;
+	unsigned int end;
+};
+
+struct tests_memdiff {
+	struct tests_memdiff_section* sections;
+	unsigned int section_count;
+};
+
+struct tests_memdiff tests_memdiff(void* mem1, void* mem2, int size) {
+	struct tests_memdiff diff = {0};
+	struct tests_memdiff_section* sections = malloc(sizeof(struct tests_memdiff_section) * size);
+	unsigned int section_count = 0;
+	unsigned int start = 0;
+	unsigned int end = 0;
+	for(int i = 0; i < size; i++) {
+		if(((char*) mem1)[i] != ((char*) mem2)[i]) {
+			if(!start) start = i;
+			end = i;
+		} else if(start) {
+			sections[section_count].start = start;
+			sections[section_count].end = end;
+			section_count++;
+			start = 0;
+			end = 0;
+		}
+	}
+	diff.sections = sections;
+	diff.section_count = section_count;
+	return diff;
+}
+
+
 
 
 // ------------------------------------------------------------------- SUBTESTS -------------------------------------------------------------------
 #define SUBTESTINDENT "  "
 
 // Custom assert, requires something to be true to continue with the test.
-#define assert(x) do { if(x) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" Assertion '"#x"' failed."); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define asserteq(x, y) do { if((x) == (y)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%d) != '"#y"'(%d).", (int) (x), (int) (y)); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define assertmemeq(x, ...) do { if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%s) != '"#__VA_ARGS__"'.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__))); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
-#define assertstreq(x, ...) do { if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; } puts(""); if(subtests_run) printf(SUBTESTINDENT); printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\").", x, __VA_ARGS__); /*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1; } while (0)
+#define assert(x) do {\
+	if(x) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" Assertion '"#x"' failed.");\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
+} while (0)
+#define asserteq(x, y) do {\
+	if((x) == (y)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%d) != '"#y"'(%d).", (int) (x), (int) (y));\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
+} while (0)
+#define assertbyteseq(x, ...) do {\
+	if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%s) != '"#__VA_ARGS__"'.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__)));\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
+} while (0)
+#define assertstreq(x, ...) do {\
+	if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\").", x, __VA_ARGS__);\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
+} while (0)
+#define assertmemeq(x, y, z) do {\
+	if(!memcmp(x, y, z)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%s) != '"#y"'(%s).", tests_print_mem((x), z), tests_print_mem((y), z));\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
+} while (0)
 
 // A sub test, which checks if something is going according to plan but if it's not, it can still continue
 // #define subtest(x, y) do {\
