@@ -31,31 +31,12 @@
  * - https://chromium.googlesource.com/v8/v8.git/+/refs/heads/main/src/codegen/x64/assembler-x64.h # V8's x64 assembler
  * - https://zhu45.org/posts/2017/Jul/30/understanding-how-function-call-works/#google_vignette
  * - https://www.computerenhance.com/p/how-does-queryperformancecounter
+ * - https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/Disassembler/X86Disassembler.cpp#L335 # LLVM's x86 disassembler
+
+ * - https://gist.github.com/mikesmullin/6259449 # Mike's x86 assembly notes
+ *   - https://gist.github.com/mikesmullin/6259449#appendix-reverse-engineering--malware-analysis
+ *   - https://gist.github.com/mikesmullin/6259449#appendix-writing-a-compiler
  */
-
-/**
- * Goal: Run this assembly program.
-default rel
-
-extern printf
-
-segment .rdata
-		msg db `Hello world!\r\n`, 0
-
-segment .text
-
-global main
-main:
-		sub     rsp, 40
-
-		lea     rcx, [msg]
-		call    printf
-
-		xor     rax, rax
-		add     rsp, 40
-		ret
-
-*/
 
 // https://l-m.dev/cs/jitcalc/#:~:text=make%20it%20executable%3F-,C%20Territory,-V%20does%20not
 
