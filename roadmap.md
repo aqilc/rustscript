@@ -1,0 +1,55 @@
+# Roadmap
+
+Step by step instructions to making the language.
+
+- [x] `return 0;`
+	- [x] Basic Tokenizing
+	- [x] Basic AST generation
+	- [x] Basic Code Generation and execution
+  	- [x] x86 Code Generation
+    	- [x] AST Iteration
+    	- [x] Statement -> Assembly
+		- [x] Custom Assembler library
+  		- [x] Assemble Basic instructions like `push rax`
+  		- [x] Prefixes
+  		- [x] Hints
+  		- [ ] Vector EXtension Instructions
+    		- [ ] EVEX
+- [x] `return 1 + 1;`
+	- [x] Expression Parsing
+		- [x] Order of Operations
+		- [x] Unary Operators
+		- [ ] Comma
+  - [x] x86 Code Generation
+    - [x] Expression iteration and emitting appropriate instructions
+- [ ] `let hi = 1;`
+	- [ ] Parse Variable Declaration
+	- [ ] x86 Code Generation
+		- [ ] Stack allocation
+		- [ ] Assignment
+		- [x] Automatic Return
+- [ ] `let hi = 1; return hi;`
+	- [ ] Sequential statements
+	- [ ] x86 Code Generation
+		- [ ] Basic Register Allocation
+- [ ] `print(1);`
+	- [ ] Function Calls
+		- [ ] Arguments
+	- [ ] Linking to the C library / externally defined functions.
+	- [ ] x86 Code Generation
+		- [ ] Function Call
+		- [ ] Calling Conventions
+			- [ ] Windows `__cdecl`
+				- [ ] Register usage
+				- [ ] Return values
+			- [ ] Working with register allocation
+- [ ] `print("hi");`
+	- [ ] Strings
+		- [ ] String Pooling
+	- [ ] Function Calls
+		- [ ] Arguments
+		- [ ] Return Values
+	- [ ] Linking to the C library / externally defined functions.
+- [ ] `fn main() { return 0; } return main();`
+	- [ ] Function Calls
+	- [ ] Linking to the C library / externally defined functions.
