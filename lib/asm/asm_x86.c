@@ -47,6 +47,11 @@
 
 
 static inline x64LookupActualIns* identify(x64Ins* ins) {
+	if (ins->op > sizeof(x64Table) / sizeof(x64LookupGeneralIns)) {
+		printf("Invalid instruction: %d", ins->op);
+		return NULL;
+	}
+
 	const x64LookupGeneralIns* unresins = x64Table + (ins->op - 1);
 	x64LookupActualIns* resolved = NULL;
 	bool preferred = false;
@@ -78,7 +83,7 @@ static inline x64LookupActualIns* identify(x64Ins* ins) {
 	}
 
 	if(!resolved) {
-		printf("No matching instruction for %s with %d arguments", unresins->name, operandnum);
+		printf("No matching instruction for %s", x64stringify(ins));
 		return NULL;
 	}
 
@@ -257,8 +262,10 @@ char* x64stringify(x64 p) {
 		memcpy(code + cursize, ins->name, inslen);
 		cursize += inslen;
 
-		code[cursize] = '\t';
-		cursize ++;
+		if(p[curins].params[0].type) {
+			code[cursize] = '\t';
+			cursize ++;
+		}
 
 		for(u32 i = 0; i < 4; i ++) {
 			if(!p[curins].params[i].type) break;

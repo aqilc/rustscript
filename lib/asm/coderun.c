@@ -17,11 +17,11 @@ void (*run(void* mem, u32 size))(void) {
 		pagesize = sysinfo.dwPageSize;
 	}
 
-	printf("Page size: %ld\n", pagesize);
+	// printf("Page size: %ld\n", pagesize);
 
 	u32 alignedsize = align(size, pagesize);
 
-	printf("Original size: %d, new size: %d\n", size, alignedsize);
+	// printf("Original size: %d, new size: %d\n", size, alignedsize);
 
 	void* buf = VirtualAlloc(NULL, alignedsize, MEM_COMMIT, PAGE_READWRITE);
 	memcpy(buf, mem, size);
