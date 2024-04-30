@@ -69,6 +69,7 @@ int subtests_run = 0;
 int subtests_passed = 0;
 int asserts = 0;
 _Bool assert_aborted = 0;
+// _Bool expect_aborted = 0;
 _Bool last_subtest_failed = 0;
 int testoutputwidth = 70;
 char* tests_cursubtest = NULL;
@@ -230,31 +231,73 @@ struct tests_memdiff tests_memdiff(void* mem1, void* mem2, int size) {
 	if(x) { asserts ++; break; }\
 	puts("");\
 	if(subtests_run) printf(SUBTESTINDENT);\
+	puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Assertion Error:"TERMRESET" Assertion '"#x"' failed.");\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = !subtest_done; return;\
+} while (0)
+#define asserteq(x, y) do {\
+	unsigned long long result1 = x;\
+	unsigned long long result2 = y;\
+	if((result1) == (result2)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Assertion Error:"TERMRESET" '"#x"'(%lld) != '"#y"'(%lld).", result1, result2);\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = !subtest_done; return;\
+} while (0)
+#define assertbyteseq(x, ...) do {\
+	if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Assertion Error:"TERMRESET" '"#x"'(%s) != '"#__VA_ARGS__"'.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__)));\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = !subtest_done; return;\
+} while (0)
+#define assertstreq(x, ...) do {\
+	if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Assertion Error:"TERMRESET" '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\").", x, __VA_ARGS__);\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = !subtest_done; return;\
+} while (0)
+#define assertmemeq(x, y, z) do {\
+	if(!memcmp(x, y, z)) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Assertion Error:"TERMRESET" '"#x"'(%s) != '"#y"'(%s).", tests_print_mem((x), z), tests_print_mem((y), z));\
+	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = !subtest_done; return;\
+} while (0)
+
+
+// Expect, continues the test even if something fails.
+#define expect(x) do {\
+	if(x) { asserts ++; break; }\
+	puts("");\
+	if(subtests_run) printf(SUBTESTINDENT);\
 	puts("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" Assertion '"#x"' failed.");\
 	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
 } while (0)
-#define asserteq(x, y) do {\
-	if((x) == (y)) { asserts ++; break; }\
+#define expecteq(x, y) do {\
+	unsigned long long result1 = x;\
+	unsigned long long result2 = y;\
+	if((result1) == (result2)) { asserts ++; break; }\
 	puts("");\
 	if(subtests_run) printf(SUBTESTINDENT);\
-	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%d) != '"#y"'(%d).", (int) (x), (int) (y));\
+	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%lld) != '"#y"'(%lld).", result1, result2);\
 	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
 } while (0)
-#define assertbyteseq(x, ...) do {\
+#define expectbyteseq(x, ...) do {\
 	if(!memcmp(x, (char[]) __VA_ARGS__, sizeof((char[]) __VA_ARGS__))) { asserts ++; break; }\
 	puts("");\
 	if(subtests_run) printf(SUBTESTINDENT);\
 	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(%s) != '"#__VA_ARGS__"'.", tests_print_mem((x), sizeof((char[]) __VA_ARGS__)));\
 	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
 } while (0)
-#define assertstreq(x, ...) do {\
+#define expectstreq(x, ...) do {\
 	if(!strcmp(x, __VA_ARGS__)) { asserts ++; break; }\
 	puts("");\
 	if(subtests_run) printf(SUBTESTINDENT);\
 	printf("("__FILE__":"TOSTRING(__LINE__)") "TERMREDBOLD"Error:"TERMRESET" '"#x"'(\"%s\") != '"#__VA_ARGS__"'(\"%s\").", x, __VA_ARGS__);\
 	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
 } while (0)
-#define assertmemeq(x, y, z) do {\
+#define expectmemeq(x, y, z) do {\
 	if(!memcmp(x, y, z)) { asserts ++; break; }\
 	puts("");\
 	if(subtests_run) printf(SUBTESTINDENT);\
@@ -262,19 +305,12 @@ struct tests_memdiff tests_memdiff(void* mem1, void* mem2, int size) {
 	/*subtests_run = 0; subtests_passed = 0;*/ tests_starttime = get_precise_time(); assert_aborted = 1;\
 } while (0)
 
-// A sub test, which checks if something is going according to plan but if it's not, it can still continue
-// #define subtest(x, y) do {\
-// 	SUBTESTINIT(x);\
-// 	if((y) && !assert_aborted) SUBTESTPASSOUTPUT(y)\
-// 	printf("\n"SUBTESTINDENT TERMREDBOLD"Subtest '" x "' (#%d) failed."TERMRESET, subtests_run);\
-// 	tests_starttime = get_precise_time(); asserts = 0;\
-// } while (0)
-
 // For subtests with multiple checks
 #define SUB(x) do { subtests_run++;\
 	printf("\n" SUBTESTINDENT x TERMRESET " %-*s", /*subtests_run,*/(int) (TESTNAMELIMIT - sizeof(SUBTESTINDENT) + 1 - sizeof(""x"") + 1), "");\
 	tests_cursubtest = (x); tests_starttime = get_precise_time(); } while(0); while((subtest_done = !subtest_done) || subend_())
 
+// Returns 0 because it always needs to return false to exit the while loop
 static inline _Bool subend_(void) {
 	// printf("asserts: %d, subtest_done: %d, assert_aborted: %d\n", asserts, subtest_done, assert_aborted);
 	if(!assert_aborted) {
@@ -303,11 +339,12 @@ static inline _Bool subend_(void) {
 		tests_starttime = get_precise_time();
 		return 0;
 	}
-	subtest_done = 0;
+	asserts = 0;
 	assert_aborted = 0;
+	subtest_done = 0;
 	printf("\n"SUBTESTINDENT TERMREDBOLD"Subtest '%s' (#%d) failed."TERMRESET, tests_cursubtest, subtests_run);
-	tests_starttime = get_precise_time(); asserts = 0;
 	last_subtest_failed = 1;
+	tests_starttime = get_precise_time();
 	return 0;
 }
 
@@ -371,7 +408,7 @@ int TESTCONCAT(test_, N)(void) {\
 	else {\
 		int allpassed = subtests_run == subtests_passed;/* Otherwise check subtests*/\
 		if(allpassed) puts("");\
-		else printf("\n"SUBTESTINDENT TERMREDBGBLACK" ERROR "TERMRESET" %d subtests tests failed.\n", subtests_run - subtests_passed);\
+		else printf("\n"SUBTESTINDENT TERMREDBGBLACK" ERROR "TERMRESET" %d subtests failed.\n", subtests_run - subtests_passed);\
 		subtests_run = 0;\
 		subtests_passed = 0;\
 		if(!allpassed) return 1;\
