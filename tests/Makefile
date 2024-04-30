@@ -65,7 +65,7 @@ TESTSUITE := tests.h tests_end.h
 
 
 
-all: tok asm parse x86
+all: tok asm parse x86 bf
 
 clean:
 	$(FILEDELETE) *.o
@@ -96,6 +96,10 @@ x86: x86$(EXEEND)
 	@echo Running '$^'
 	@$(STUPIDUNIXSHIT)x86$(EXEEND)
 
+bf: bf$(EXEEND)
+	@echo Running '$^'
+	@$(STUPIDUNIXSHIT)bf$(EXEEND)
+
 .PHONY: all tok asm parse x86 clean
 
 
@@ -110,7 +114,10 @@ asm$(EXEEND): asmtest$(OBJEND) asm_x86$(OBJEND)
 parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) tok$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-x86$(EXEEND): x86test$(OBJEND) x86$(OBJEND) asm_x86$(OBJEND) tok$(OBJEND) parse$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
+x86$(EXEEND): x86test$(OBJEND) x86$(OBJEND) coderun$(OBJEND) asm_x86$(OBJEND) tok$(OBJEND) parse$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
+	@$(CC) $^ $(EXENAME)$@ $(LINK)
+
+bf$(EXEEND): bftest$(OBJEND) coderun$(OBJEND) asm_x86$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 # ============= Test Builds =============
@@ -123,7 +130,10 @@ asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
 parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-x86test$(OBJEND): x86.c ../lib/backends/x86.c ../lib/backends/x86.h ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h ../lib/parse.c $(TESTSUITE)
+x86test$(OBJEND): x86.c ../lib/backends/x86.c ../lib/asm/coderun.c ../lib/asm/coderun.h ../lib/backends/x86.h ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h ../lib/parse.c $(TESTSUITE)
+	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
+
+bftest$(OBJEND): bf.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # ----------- Base lib builds ------------
