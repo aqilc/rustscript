@@ -7,7 +7,6 @@ typedef struct RS_Stmt RS_Stmt;
 typedef struct RS_Type RS_Type;
 typedef struct RS_Expr RS_Expr;
 
-
 enum RS_TypeT {
 	TY_U8, TY_U16, TY_U32, TY_U64,
 	TY_I8, TY_I16, TY_I32, TY_I64,
@@ -15,7 +14,6 @@ enum RS_TypeT {
 };
 
 struct RS_Type {
-	u32 tok; // TT_TX
 	bool isptr;
 	bool signedness;
 };
@@ -45,12 +43,9 @@ struct RS_Scope {
 struct RS_Expr {
 	RS_Token* tok; // TT_OPX
 	RS_ExprT type;
+	u8 paramnum;
 	union {
-		struct {
-			RS_Expr* first;
-			RS_Expr* second;
-			RS_Expr* third;
-		}; // Binary
+		RS_Expr* params[3];
 		struct {
 			RS_Expr* func;
 			RS_Expr** args;
@@ -92,6 +87,8 @@ struct RS_ParserState {
 	char* src;
 	RS_Token* toks;
 	u32 ind;
+	u32 errors;
+	u32 warnings;
 };
 
 typedef RS_Stmt* AST;

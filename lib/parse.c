@@ -6,12 +6,27 @@
 #include "parse.h"
 #include "error.h"
 
-#define error(...) error_at(st->src, st->toks[st->ind].place, st->file, __VA_ARGS__)
+#define error(...) error_at(st->src, st->toks[st->ind + 1].place, st->file, __VA_ARGS__)
+
+
+enum RS_OpClass {
+	OC_FORBIDDEN = 0,
+	OC_POSTFIX /* -- ++ ?. . */,
+	OC_UNARY /* ++ -- - + ~ ! */, OC_POW /* ** */, OC_BIT /* | & ^ << >> */,
+	OC_MUL /* * / % */, OC_ADD /* + - */,
+	OC_TERTIARY /* ?: */,
+	OC_ASSIGN /* = += -= *= /= %= &= |= ^= <<= >>= */,
+	OC_COMMA /* , */,
+	OC_PAREN /* () */
+};
 
 static void parse_stmt(struct RS_ParserState*);
-static RS_Expr* parse_expr(struct RS_ParserState* st);
+static RS_Expr* parse_expr(struct RS_ParserState* st, enum RS_OpClass highest);
 static RS_Type* parse_type(struct RS_ParserState*);
 static RS_FuncArg* parse_funcarg(struct RS_ParserState*);
+static void parse_check(struct RS_ParserState* st, RS_Expr* ex);
+static RS_Token* expect(struct RS_ParserState* st, enum RS_TokenType type);
+
 
 struct RS_ParserState* parse(char* file, char* str) {
 	RS_Token* toks = tokenize(str);
@@ -30,11 +45,17 @@ struct RS_ParserState* parse(char* file, char* str) {
 		.file = file,
 		.src = str,
 		.toks = toks,
-		.ind = 0
+		.ind = 0,
+		.errors = 0,
+		.warnings = 0,
 	};
 
 	while(state->toks[state->ind].type != TT_EOF) parse_stmt(state);
 	vpush(state->ast, { .type = ST_EOF });
+
+	vfor(state->expressions, expr)
+		parse_check(state, expr);
+	
 	return state;
 }
 
@@ -42,62 +63,58 @@ static void parse_stmt(struct RS_ParserState* st) {
 	switch(st->toks[st->ind++].type) {
 		case TT_PSEMICOLON: return;
 		case TT_KRETURN:
-			vpush(st->ast, { .type = ST_RETURN, .ret = parse_expr(st) });
+			vpush(st->ast, { .type = ST_RETURN, .ret = parse_expr(st, 0) });
+			return;
+		case TT_KLET:
+			
 			return;
 		default:
 			st->ind--;
-			vpush(st->ast, { .type = ST_EXPR, .expr = parse_expr(st) });
+			vpush(st->ast, { .type = ST_EXPR, .expr = parse_expr(st, 0) });
 			return;
 	}
 }
 
-enum OP_CLASSES {
-	FORBIDDEN = 0,
-	POSTFIX = 1 /* -- ++ ?. . */,
-	UNARY = 2 /* ++ -- - + ~ ! */, POW = 3 /* ** */, BIT = 4 /* | & ^ << >> */,
-	MUL = 5 /* * / % */, ADD = 6 /* + - */,
-	TERTIARY = 7 /* ?: */,
-	ASSIGN = 8 /* = += -= *= /= %= &= |= ^= <<= >>= */,
-	COMMA = 9 /* , */,
-};
-
 struct {
-	char prec;
+	enum RS_OpClass prec[3];
+	bool right_assoc;
 } precedences[] = {
-	[TT_OPADD] = { ADD },
-	[TT_OPSUB] = { ADD },
-	[TT_OPMUL] = { MUL },
-	[TT_OPDIV] = { MUL },
-	[TT_OPMOD] = { MUL },
-	[TT_OPPOW] = { BIT },
-	[TT_OPBXOR] = { BIT },
-	[TT_OPBOR] = { BIT },
-	[TT_OPBAND] = { BIT },
-	[TT_OPBSHIFTRIGHT] = { BIT },
-	[TT_OPBSHIFTLEFT] = { BIT },
-	[TT_OPSET] = { ASSIGN },
-	[TT_OPADDSET] = { ASSIGN },
-	[TT_OPSUBSET] = { ASSIGN },
-	[TT_OPMULSET] = { ASSIGN },
-	[TT_OPDIVSET] = { ASSIGN },
-	[TT_OPMODSET] = { ASSIGN },
-	[TT_OPPOWSET] = { ASSIGN },
-	[TT_OPBXORSET] = { ASSIGN },
-	[TT_OPBORSET] = { ASSIGN },
-	[TT_OPBANDSET] = { ASSIGN },
-	[TT_OPBSHIFTRIGHTSET] = { ASSIGN },
-	[TT_OPBSHIFTLEFTSET] = { ASSIGN },
-	[TT_OPDOT] = { POSTFIX },
-	[TT_OPQUESDOT] = { POSTFIX },
-	[TT_OPQUES] = { TERTIARY },
-	[TT_OPINCR] = { POSTFIX },
-	[TT_OPDECR] = { POSTFIX },
+	[TT_OPADD]            = { { OC_FORBIDDEN, OC_ADD,       OC_FORBIDDEN } },
+	[TT_OPSUB]            = { { OC_UNARY,     OC_ADD,       OC_FORBIDDEN } },
+	[TT_OPMUL]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPDIV]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPMOD]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPPOW]            = { { OC_FORBIDDEN, OC_POW,       OC_FORBIDDEN }, true },
+	[TT_OPBXOR]           = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBOR]            = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBAND]           = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBSHIFTRIGHT]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBSHIFTLEFT]     = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPSET]            = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPADDSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPSUBSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPMULSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPDIVSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPMODSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPPOWSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBXORSET]        = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBORSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBANDSET]        = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBSHIFTRIGHTSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBSHIFTLEFTSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPDOT]            = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPQUESDOT]        = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPQUES]           = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
+	[TT_OPINCR]           = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPDECR]           = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
 
-	[TT_LNOT] = { UNARY },
-	[TT_LOR] = { UNARY },
-	[TT_LAND] = { UNARY },
-	// [TT_PCOLON] = { TERTIARY },
-	[TT_ERROR] = { FORBIDDEN }, // Just to extend the array size to accomodate all tokens
+	[TT_POPENPAR]         = { { OC_PAREN,     OC_FORBIDDEN, OC_FORBIDDEN } },
+
+	[TT_LNOT]             = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	[TT_LOR]              = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	[TT_LAND]             = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	// [TT_PCOLON]        = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
+	[TT_ERROR]            = { { OC_FORBIDDEN, OC_FORBIDDEN, OC_FORBIDDEN } }, // Just to extend the array size to accomodate all tokens
 };
 
 /*
@@ -118,126 +135,135 @@ struct {
  *           |
  *           2
  */
-static RS_Expr* parse_expr(struct RS_ParserState* st) {
+static RS_Expr* parse_expr(struct RS_ParserState* st, enum RS_OpClass highest) {
 	vpush(st->expressions, {});
 	int parens = 0;
-	RS_Expr** curexpr = vnew();
-	RS_Expr* topexpr = vlast(st->expressions); // Always the highest order expression
-	RS_Expr* prim = topexpr;
-
-
-	#define RESET_PARENT() \
-		if(vlen(curexpr)) {\
-			if(curexpr[vlen(curexpr) - 1]->first)\
-				curexpr[vlen(curexpr) - 1]->second = prim;\
-			else curexpr[vlen(curexpr) - 1]->first = prim;\
-		}
+	int depth = 1;
+	static RS_Expr* curexpr[1000] = {};
+	RS_Expr* prim = curexpr[0] = vlast(st->expressions);
 
 primary:
 	prim->tok = st->toks + st->ind;
 	switch(st->toks[st->ind++].type) {
 	case TT_IDENT:
-		prim->type = EX_VAR;
-		RESET_PARENT()
-		break;
 	case TT_FLOAT:
 	case TT_STRING:
 	case TT_INT:
 		prim->type = EX_PRIM;
-		RESET_PARENT()
+		curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = prim;
 		break;
+	case TT_POPENPAR:
+		parens ++;
 	case TT_OPBNOT:
 	case TT_OPSUB:
 	case TT_OPADD:
-		vpush(curexpr, 0);
-		curexpr[vlen(curexpr) - 1]->type = EX_REGULAR;
-		curexpr[vlen(curexpr) - 1]->tok = st->toks + st->ind - 1;
+		vpush(st->expressions, {
+			.type = EX_REGULAR,
+			.tok = st->toks + st->ind - 1,
+			.paramnum = 0,
+		});
+		curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = vlast(st->expressions);
+		curexpr[depth++] = vlast(st->expressions);
 		goto primary;
-	case TT_POPENPAR:;
-		parens ++;
-		// Idea: Maintain a stack for parent expressions, with the top of the stack being the first `out`, and then preceeding stack entries being the "more current" sub-expression.
-		// *parens++;
-		// prim = parse_expr(st, parens);
-		// if(st->toks[st->ind++].type != TT_PCLOSEPAR) vpop(st->expressions), error("Expected ')'");
-		// *parens--;
-		// RESET_PARENT()
-		break;
 	case TT_PSEMICOLON:
 	case TT_EOF:
 	case TT_PCLOSEPAR:
-		error("Expected an expression here");
-		// error("Expected an expression here (got %s)", toktype(st->toks[st->ind - 1].type));
+		error("Expected an expression here (got %s) (debug: resolving %s)", toktostr[st->toks[st->ind - 1].type], toktostr[curexpr[depth - 1]->tok->type]);
 		return NULL;
-	default: error("Unexpected token"); return NULL;
+	default: error("Unexpected token(got %s)", toktostr[st->toks[st->ind - 1].type]); return NULL;
 	}
 
 	RS_Token* op = st->toks + st->ind;
 
+detectparens:
+	if (op->type == TT_PCLOSEPAR) {
+		if(parens) {
+			// error("Expected an expression here (got %s) (debug: resolving %s, %s)", toktostr[st->toks[st->ind - 1].type], toktostr[curexpr[depth - 1]->tok->type], toktostr[curexpr[depth - 2]->tok->type]);
+			// debug_expr(curexpr[0]); printf("   ");
+			op = st->toks + ++st->ind;
+			parens --;
+			while(depth > 1 && curexpr[depth - 1]->tok->type != TT_POPENPAR)
+				depth --;
+			depth --;
+			if(depth > 0) curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = curexpr[depth]->params[0], prim = curexpr[depth - 1];
+			else prim = curexpr[depth];
+			// error("Expected an expression here (got %s) (debug: resolving %s, %s)", toktostr[st->toks[st->ind - 1].type], toktostr[curexpr[depth - 1]->tok->type], toktostr[curexpr[depth]->tok->type]);
+			// debug_expr(curexpr[depth]);
+			goto detectparens;
+		} else {
+			error("Unexpected closing parenthesis");
+			return NULL;
+		}
+	}
+
 	if (op->type == TT_PSEMICOLON ||
 			op->type == TT_EOF) {
+		
 		if(parens) {
 			error("Statement ended in the middle of an expression.");
 			return NULL;
 		}
-		vfree(curexpr);
-		return topexpr;
+
+		return curexpr[0];
 	}
 
-	if(precedences[op->type].prec) {
+	if(highest && precedences[op->type].prec[1] > highest) {
+		st->ind--;
+		return curexpr[0];
+	}
+
+	// Go up the operator hierarchy chain, and swap the operator that has the higher precedence with the one that has lower precedence
+	if(precedences[op->type].prec[1]) {
 		st->ind++;
 		
-		vpusharr(st->expressions, {{}, {}});
+		vpusharr(st->expressions, {{
+			.type = EX_REGULAR,
+			.tok = op,
+			.paramnum = 1,
+		}, {}});
 
 		RS_Expr* opexpr = vlast(st->expressions) - 1;
-		opexpr->type = EX_REGULAR;
-		opexpr->tok = op;
-
 		RS_Expr* tempprim = prim;
 		prim = vlast(st->expressions);
 
-		if(vlen(curexpr)) {
-
-			// If the operator is of a higher order than the current top operator, make it the new top operator
-			if(precedences[op->type].prec >= precedences[topexpr->tok->type].prec) {
-				vempty(curexpr);
-				vpush(curexpr, opexpr);
-				opexpr->first = topexpr;
-				topexpr = opexpr;
-				goto primary;
-			}
-
-
-			u32 curexprind = vlen(curexpr) - 1;
-			while(curexprind > 0 &&
-						precedences[curexpr[curexprind]->tok->type].prec &&
-						precedences[curexpr[curexprind]->tok->type].prec <= precedences[op->type].prec)
-				curexprind --, vpop(curexpr);
-			
-			opexpr->first = curexpr[curexprind]->second;
-			curexpr[curexprind]->second = opexpr;
-
-			vpush(curexpr, opexpr);
+		// If the operator is of a higher order than the current top operator, make it the new top operator
+		if(!parens && precedences[curexpr[0]->tok->type].prec[curexpr[0]->paramnum] <= precedences[op->type].prec[curexpr[0]->paramnum]) {
+			opexpr->params[0] = curexpr[0];
+			depth = 1;
+			curexpr[0] = opexpr;
 			goto primary;
 		}
 
-		vpush(curexpr, opexpr);
-		opexpr->first = tempprim;
-		topexpr = opexpr;
+		// Already checked curexpr[0]
+		while(depth > 1 &&
+					precedences[curexpr[depth - 1]->tok->type].prec[curexpr[depth - 1]->paramnum] &&
+					precedences[curexpr[depth - 1]->tok->type].prec[curexpr[depth - 1]->paramnum] <= precedences[op->type].prec[curexpr[depth - 1]->paramnum])
+			depth --;
+		
+		opexpr->params[0] = curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum];
+		curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = opexpr;
+
+		curexpr[depth++] = opexpr;
 		goto primary;
 	}
 
-	vfree(curexpr);
-	return topexpr;
+	return curexpr[0];
 }
 
-// Prints out the tree for the expression
+// Prints out the tree for the expression.
 void debug_expr(RS_Expr* ex) {
 	if(!ex) return;
 	if(ex->type == EX_REGULAR) {
+		if(!ex->params[1]) {
+			printf("(%s ", toktostr[ex->tok->type]);
+			debug_expr(ex->params[0]);
+			printf(")");
+			return;
+		}
 		printf("(");
-		debug_expr(ex->first);
+		debug_expr(ex->params[0]);
 		printf(" %s ", toktostr[ex->tok->type]);
-		debug_expr(ex->second);
+		debug_expr(ex->params[1]);
 		printf(")");
 	} else {
 		printf("%lld", ex->tok->intv);
@@ -245,9 +271,7 @@ void debug_expr(RS_Expr* ex) {
 }
 
 // Checks types and assigns them to the expression.
-static bool parse_check(RS_Expr* ex) {
-	// if()
-	return true;
+static void parse_check(struct RS_ParserState* st, RS_Expr* ex) {
 }
 
 
@@ -257,4 +281,24 @@ static RS_Type* parse_type(struct RS_ParserState* st) {
 		default: error("Unexpected token"); return NULL;
 	}
 }
+
+
+static RS_Token* expect(struct RS_ParserState* st, enum RS_TokenType type) {
+	if(st->toks[st->ind].type != type) {
+		error("Expected %s, got %s", toktostr[type], toktostr[st->toks[st->ind].type]);
+		return NULL;
+	}
+	return st->toks + st->ind++;
+}
+
+static RS_FuncArg* parse_funcarg(struct RS_ParserState* st) {
+	switch(st->toks[st->ind++].type) {
+		default: error("Unexpected token"); return NULL;
+	}
+}
+
+
+
+
+
 
