@@ -58,7 +58,7 @@ bin
 build
 .vs
 .vscode
-*.raddbg
+*.raddbg*
 *.tmp*
 main*.idx
 main*.run
