@@ -15,7 +15,7 @@ double hi;
 #define INSTEST(bytes, ...) curins = (x64Ins) { __VA_ARGS__ }; SUB(#__VA_ARGS__ " => " #bytes) {\
 	instructionlen = x64emit(&curins, buf);\
 	expectedinslen = sizeof(#bytes) / 5;\
-	asserteq(instructionlen, expectedinslen);
+	expecteq(instructionlen, expectedinslen);
 #define INSTESTMEMEQ(...) assertbyteseq(buf, { __VA_ARGS__ }); } SUBBENCH() { x64emit(&curins, buf); }
 
 TEST("Assemble push instructions (1 argument, with optional REX and Addressing Overrides)") {
@@ -73,6 +73,9 @@ TEST("Assemble lea instructions (2 arguments, with optional REX and Immediates)"
 
 	INSTEST(0x67 0x41 0x8D 0x4B 0x08, LEA, ecx, mem($r11d, 8));
 	INSTESTMEMEQ(0x67, 0x41, 0x8D, 0x4B, 0x08);
+
+	INSTEST(0x48 0x8d 0x05 0x08 0x00 0x00 0x00, LEA, rax, mem($rip, 8));
+	INSTESTMEMEQ(0x48, 0x8d, 0x05, 0x08, 0x00, 0x00, 0x00);
 }
 
 TEST("Assemble FPU Instructions (1-2 arguments with different, FPU operand types)") {
@@ -84,7 +87,7 @@ TEST("Assemble FPU Instructions (1-2 arguments with different, FPU operand types
 	INSTEST(0xDD 0x04 0x25 0x02 0x00 0x00 0x00, FLD, m64($none, 2));
 	INSTESTMEMEQ(0xDD, 0x04, 0x25, 0x02, 0x00, 0x00, 0x00);
 
-	INSTEST(0xD8 0xCA, FMUL, st0, st(2));
+	INSTEST(0xD8 0xCA, FMUL, st0, st2);
 	INSTESTMEMEQ(0xD8, 0xCA);
 
 	INSTEST(0xD9 0xE8, FLD1);
