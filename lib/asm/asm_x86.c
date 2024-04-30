@@ -7,10 +7,17 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include "asm_x86.h"
 #include <util.h>
+#include <stdarg.h>
+#include <malloc.h>
+#include "asm_x86.h"
+
+/**
+ * TODO: Add support for VEX and EVEX instructions.
+ * TODO: Error messages for using a 32 bit register to address on a mem64 operand.
+ * TODO: 32 Bit support?
+ */
 
 // https://github.com/StanfordPL/x64asm
 
@@ -40,15 +47,48 @@
 
 // https://l-m.dev/cs/jitcalc/#:~:text=make%20it%20executable%3F-,C%20Territory,-V%20does%20not
 
+static u32 encode(x64Ins* ins, x64LookupActualIns* res, char* opcode_dest);
+
 #define ismem(x) (x >= M8 && x <= FARPTR1664)
 #define membase(x) ((x >> 32) & 0x1f)
 #define memindex(x) ((x >> 40) & 0x1f)
 #define memscale(x) ((x >> 48) & 0x3)
 
+_Thread_local struct AssemblyError {
+	bool error;
+	char buf[100];
+	enum AssemblyErrorType {
+		ASMERR_INVALID_INS,
+		ASMERR_INVALID_REG_TYPE,
+		ASMERR_NO_MATCHING_INS,
+		ASMERR_ESPRSP_USED_AS_BASE,
+		ASMERR_REL_OUT_OF_RANGE
+		// More to come
+	} error_type;
+} cur_error;
+
+static inline u32 error(enum AssemblyErrorType type, char* fmt, ...) {
+	cur_error.error = true;
+	cur_error.error_type = type;
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(cur_error.buf, 100, fmt, args);
+	va_end(args);
+	return 0;
+}
+
+char* get_error(int* errcode) {
+	if(cur_error.error) {
+		cur_error.error = false;
+		if(errcode) *errcode = cur_error.error_type;
+		return cur_error.buf;
+	}
+	return NULL;
+}
 
 static inline x64LookupActualIns* identify(x64Ins* ins) {
 	if (ins->op > sizeof(x64Table) / sizeof(x64LookupGeneralIns)) {
-		printf("Invalid instruction: %d", ins->op);
+		error(ASMERR_INVALID_INS, "Invalid instruction: %d", ins->op);
 		return NULL;
 	}
 
@@ -74,7 +114,7 @@ static inline x64LookupActualIns* identify(x64Ins* ins) {
 			if(!(actual->args[j] & insoperands[j])) { match = false; break; }
 			else if(resolved && (
 					resolved->args[j] < (actual->args[j] & insoperands[j]) || // Generally, more specific arguments have a higher set bit than less specific ones.
-					resolved->oplen + resolved->preflen + !!resolved->pref66 > actual->oplen + actual->preflen + !!actual->pref66 ||
+					// resolved->oplen + resolved->preflen + !!resolved->pref66 > actual->oplen + actual->preflen + !!actual->pref66 ||
 					(resolved->modrmreq && !actual->modrmreq))) morespecific = true;
 		if(!match || (preferred && !actual->preffered)) continue;
 		else if(actual->preffered) preferred = true;
@@ -83,18 +123,15 @@ static inline x64LookupActualIns* identify(x64Ins* ins) {
 	}
 
 	if(!resolved) {
-		printf("No matching instruction for %s", x64stringify(ins));
+		error(ASMERR_NO_MATCHING_INS, "No matching instruction for %s", x64stringify(ins));
 		return NULL;
 	}
 
 	return resolved;
 }
 
-
 // Instructions to keep note of: MOVS mem, mem on line 1203, page 844 in the manual.
-u32 x64emit(x64Ins* ins, char* opcode_dest) {
-	if(ins->op == 0) return 0;
-	x64LookupActualIns* res = identify(ins);
+static u32 encode(x64Ins* ins, x64LookupActualIns* res, char* opcode_dest) {
 	if(!res) return 0;
 
 	// ------------------------------ Special Instructions ------------------------------ //
@@ -113,24 +150,22 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 
 	char const* opcode_dest_start = opcode_dest;
 
-	// Segment Register for memory operands - Prefix group 2 - GCC Ordering
+	// Segment Register for memory operands - Prefix group 2 (GCC Ordering)
 	if(res->mem_operand && ins->params[res->mem_operand].type & ((u64) 0x7 << 56))
 		*opcode_dest = ((char[]) { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 })[((ins->params[res->mem_operand].type >> 56) & 0x7) - 1], opcode_dest ++;
 	
-	// 67H prefix - Prefix group 4 - GCC Ordering
+	// 67H prefix - Prefix group 4 (GCC Ordering)
 	if(res->mem_operand && (ins->params[res->mem_operand - 1].value & ((u64) 0x1 << 60)))
 		*opcode_dest = 0x67, opcode_dest ++;
 
 	// Only for Normal **NON** VEX and EVEX instructions
 	if(!res->vexxopevex) {
 
-		// 66H prefix - Prefix group 3 - GCC Ordering
-		if(res->pref66) *opcode_dest = 0x66, opcode_dest ++;
-
-		// FWAIT and Prefix Group 1
+		// 66H prefix - Prefix group 3 (GCC Ordering) + FWAIT and Prefix Group 1
 		if(res->prefixes) {
 			if(res->prefixes < 0x100) *opcode_dest = res->prefixes, opcode_dest ++;
-			else *(u16*) opcode_dest = res->prefixes, opcode_dest += 2;
+			else if(res->prefixes < 0x10000) *(u16*) opcode_dest = res->prefixes, opcode_dest += 2;
+			else *(u16*) opcode_dest = res->prefixes >> 8, *(u8*) (opcode_dest + 2) = res->prefixes & 0xff, opcode_dest += 3;
 		}
 	}
 
@@ -160,13 +195,14 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 		if(ismem(rm->type)) {
 			if(rm->value & 0x2000000000000000) // RIP-relative addressing
 				*opcode_dest = modrm | 0x05 /* MOD = 00, REG = XXX, RM = 101 (RIP) */, *(int*)(opcode_dest + 1) = rm->value, opcode_dest += 5;
+
 			else {
 				// NOTE: RBP CANNOT BE A BASE REGISTER WHEN USING SIB! Use it to index instead! https://stackoverflow.com/a/52522744/10013227
 				u16 base = membase(rm->value);
 				u16 index = memindex(rm->value);
 
 				if(base & 0x10) { // No base register => SIB byte without base.
-					u8 sib = (index | 0x10) ? 0x25/* Index = 100, Base = 101, both null*/ : memscale(rm->value) << 6 | index << 3 | 0x5;
+					u8 sib = (index | 0x10) ? 0x25/* Scale = 1, Index = 100, Base = 101, both null*/ : memscale(rm->value) << 6 | (index & 0x7) << 3 | 0x5;
 					*opcode_dest = modrm | 0x04 /* MOD = 00, REG = XXX, RM = 100 */, *(opcode_dest + 1) = sib;
 					*(int*) (opcode_dest + 2) = (int) rm->value; // I don't know why, but when the base is null, there's always a 32 bit displacement encoded with the ModR/M + SIB byte.
 					opcode_dest += 6;
@@ -175,7 +211,9 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 
 				base &= 0x7; // It doesn't matter if it's an r8-r13 register now, since we already took care of that in the REX prefix byte.
 				if((int) rm->value) {
-					if(base == $esp) printf("ERROR: ESP/RSP cannot be used as a base register for memory!");
+					if(base == $esp)
+						return error(ASMERR_ESPRSP_USED_AS_BASE, "ERROR: ESP/RSP cannot be used as a base register for memory!");
+
 					if(index & 0x10) // No SIB byte required!
 
 						if((int) rm->value <= 128 || (int) rm->value >= -128) // 1 byte/8 bit displacement
@@ -198,7 +236,7 @@ u32 x64emit(x64Ins* ins, char* opcode_dest) {
 					*opcode_dest = 0x45 /* MOD = 01, REG = XXX, RM = 101 */, *(opcode_dest + 1) = (char) rm->value /* 1 Byte/8 Bit Disp */, opcode_dest ++;
 				else *opcode_dest = modrm | base, opcode_dest ++;
 			}
-		} else *opcode_dest = modrm | 0xC0 | (rm->value & 0x7), opcode_dest ++; // Is not a memory operand, so rm->value is the register number.
+		} else *opcode_dest = modrm | 0xC0 | (rm->value & 0x7) /* MOD = 11, REG = XXX, RM = XXX */, opcode_dest ++; // Is not a memory operand, so RM is the register number.
 	}
 
 	// For instructions that have +rw, +rd etc
@@ -216,10 +254,30 @@ end:
 			case 8: *(u64*) opcode_dest = ins->params[res->immediate - 1].value; break;
 		}
 		opcode_dest += size;
+		// if(immediatesize == 8 && 
+	}
+
+	// Relative displacement for instructions like JMP
+	else if(res->rel_operand) {
+		if(res->args[res->rel_operand - 1] == REL8) {
+			*opcode_dest = ins->params[res->rel_operand - 1].value;
+			opcode_dest ++;
+		} else { // HAS to be Rel32 for x64.
+			*(int*) opcode_dest = ins->params[res->rel_operand - 1].value;
+			opcode_dest += 4;
+		}
 	}
 
 	return opcode_dest - opcode_dest_start;
 }
+
+
+u32 x64emit(x64Ins* ins, char* opcode_dest) {
+	if(ins->op == 0) return 0;
+	x64LookupActualIns* res = identify(ins);
+	return encode(ins, res, opcode_dest);
+}
+
 
 static const char* reg_stringify(x64Operand* reg) {
 	if(reg->type & R8) return ((const char*[]){ "al", "cl", "dl", "bl", "sil", "dil", "bpl", "spl", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" })[reg->value];
@@ -277,47 +335,50 @@ char* x64stringify(x64 p) {
 			if(p[curins].params[i].type & allregmask) {
 				const char* reg = reg_stringify(p[curins].params + i);
 				if(!reg) {
-					printf("Invalid register type: %llX", p[curins].params[i].type);
+					error(ASMERR_INVALID_REG_TYPE, "Invalid register type: %llX", p[curins].params[i].type);
 					free(code);
 					return NULL;
 				}
 				u32 reglen = strlen(reg);
 				memcpy(code + cursize, reg, reglen);
 				cursize += reglen;
-			} else if(p[curins].params[i].type & (IMM8 | IMM16 | IMM32 | IMM64)) {
-				u32 imm = p[curins].params[i].value;
-				u32 immstr = sprintf(code + cursize, "0x%X", imm);
-				cursize += immstr;
-			} else if(p[curins].params[i].type & (M8 | M16 | M32 | M64 | M128 | M256 | M512 | FARPTR1616 | FARPTR1632 | FARPTR1664)) {
-				if(p[curins].params[i].value & 0x0700000000000000) {
-					u32 segstr = sprintf(code + cursize, "%s:", reg_ref_stringify(((p[curins].params[i].value >> 48) & 0x7) - 1 + $es));
-					cursize += segstr;
-				}
+			}
+			else if(p[curins].params[i].type & (IMM8 | IMM16 | IMM32 | IMM64))
+				cursize += sprintf(code + cursize, "0x%llX", p[curins].params[i].value);
+
+			else if(p[curins].params[i].type & (REL8 | REL32))
+				cursize += sprintf(code + cursize, "$%+d", (u32) p[curins].params[i].value);
+
+			else if(p[curins].params[i].type & (M8 | M16 | M32 | M64 | M128 | M256 | M512 | FARPTR1616 | FARPTR1632 | FARPTR1664)) {
+
+				if(p[curins].params[i].value & 0x0700000000000000)
+					cursize += sprintf(code + cursize, "%s:", reg_ref_stringify(((p[curins].params[i].value >> 48) & 0x7) - 1 + $es));
+
 				code[cursize] = '[';
 				cursize += 1;
+
 				if(p[curins].params[i].value & 0x2000000000000000) {
-					u32 memstr = sprintf(code + cursize, "rip + 0x%X", (u32) p[curins].params[i].value);
-					cursize += memstr;
+					if(p[curins].params[i].value & 0x3000000000000000)
+						cursize += sprintf(code + cursize, "rip %s 0x%X", p[curins].params[i].value < 0 ? "-" : "+", (i32) p[curins].params[i].value);
+
+					// RIP-relative taking instructions into account
+					else cursize += sprintf(code + cursize, "$%+d", (u32) p[curins].params[i].value);
+					
 				} else {
 					u32 base = membase(p[curins].params[i].value);
 					u32 index = memindex(p[curins].params[i].value);
 					u32 scale = memscale(p[curins].params[i].value);
-					if(!(base & 0x10)) {
-						u32 basestr = sprintf(code + cursize, "%s", reg_ref_stringify(base + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax)));
-						cursize += basestr;
-					}
-					if(p[curins].params[i].value & 0xffffffff) {
-						u32 dispstr = sprintf(code + cursize, " + 0x%X", (u32) p[curins].params[i].value);
-						cursize += dispstr;
-					}
-					if(!(index & 0x10)) {
-						u32 indexstr = sprintf(code + cursize, " + %s", reg_ref_stringify(index + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax)));
-						cursize += indexstr;
-					}
-					if(scale) {
-						u32 scalestr = sprintf(code + cursize, " * %d", 1 << scale);
-						cursize += scalestr;
-					}
+
+					if(!(base & 0x10))
+						cursize += sprintf(code + cursize, "%s", reg_ref_stringify(base + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax)));
+
+					if(p[curins].params[i].value & 0xffffffff)
+						cursize += sprintf(code + cursize, " + 0x%X", (u32) p[curins].params[i].value);
+
+					if(!(index & 0x10))
+						cursize += sprintf(code + cursize, " + %s", reg_ref_stringify(index + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax)));
+
+					if(scale)	cursize += sprintf(code + cursize, " * %d", 1 << scale);
 				}
 				code[cursize] = ']';
 				cursize ++;
@@ -339,22 +400,95 @@ char* x64stringify(x64 p) {
 	return code;
 }
 
-char* x64as(x64 p, u32* len) {
-	char* code = malloc(14);
+char* x64as(u32 num, x64 p, u32* len) {
+	u32 cap = num * 7 + 15;
+	char* code = malloc(cap); // 15 is the maximum size of an instruction.
+	// Example: lwpval rax, cs:[rax+rbx*8+0x23829382], 100000000
 	u32 ins = 0;
 	*len = 0;
 
+	u16* indexes;
+	bool indexmalloced = false;
+	if(num > 96)
+		indexes = malloc(sizeof(u16) * num), indexmalloced = true;
+	else indexes = alloca(sizeof(u16) * num);
+
+	static struct {
+		u32 ins; bool relref; // Riprel or normal relative
+		u8 size; u8 param;
+		x64LookupActualIns* res; // no point in making anything a union because of alignment
+	} relrefidxes[48];
+	u32 relreflen = 0;
+
 	while (p[ins].op) {
-		u32 curlen = x64emit(p + ins, code + *len);
-		if(!curlen) {
-			free(code);
-			*len = 0;
-			return NULL;
+		x64LookupActualIns* res = identify(p + ins);
+		int curlen = encode(p + ins, res, code + *len);
+		if(!curlen) goto error;
+
+		// Identify relrefs
+		if(res->mem_operand && p[ins].params[res->mem_operand - 1].value & 0x4000000000000000) {
+			i32 insns = p[ins].params[res->mem_operand - 1].value;
+			if(insns < 0) {
+				if(insns + ins < 0) {
+					error(ASMERR_REL_OUT_OF_RANGE, "Relative reference out of range on ins '%s'", x64stringify(p + ins));
+					goto error;
+				}
+
+				i32 offset = indexes[ins + offset] - indexes[ins] - curlen;
+
+				// Currently no better way other than to directly reencode.
+				p[ins].params[res->mem_operand - 1].value &= ~((u64) 0xffffffff);
+				p[ins].params[res->mem_operand - 1].value |= ((u64) offset) & 0xffffffff;
+				encode(p + ins, res, code + *len);
+			} else {
+				relrefidxes[relreflen].ins = ins;
+				relrefidxes[relreflen].res = res;
+				relrefidxes[relreflen].param = res->mem_operand - 1;
+				relrefidxes[relreflen].relref = true;
+				relreflen ++;
+			}
 		}
+
+		if(res->rel_operand) {
+			relrefidxes[relreflen].ins = ins;
+			relrefidxes[relreflen].size = res->args[res->rel_operand - 1] == REL32 ? 4 : 1;
+			relrefidxes[relreflen].param = res->rel_operand - 1;
+			relreflen ++;
+		}
+
+		indexes[ins] = *len;
 		*len += curlen;
-		code = realloc(code, *len + 14);
+
+		if(*len >= cap) code = realloc(code, (cap += (num - ins) * 15));
 		ins ++;
 	}
+
+	for(u32 i = 0; i < relreflen; i ++) {
+		u32 relidx = relrefidxes[i].ins;
+		int offset = indexes[
+			relidx + /* The current instruction that is being resolved */
+			(i32) p[relidx].params[relrefidxes[i].param].value + /* The offset of the relative */
+			1 /* because the offset is after the instruction has ended */
+		] - indexes[relidx + 1]; /* Added 1 because the value is after the current rip of the instruction */
+		
+		if(relrefidxes[i].relref) {
+			// Currently no better way other than to directly reencode.
+			p[relrefidxes[i].ins].params[relrefidxes[i].param].value &= ~((u64) 0xffffffff);
+			p[relrefidxes[i].ins].params[relrefidxes[i].param].value |= ((u64) offset) & 0xffffffff;
+			encode(p + relrefidxes[i].ins, relrefidxes[i].res, code + indexes[relidx]);
+		} else {
+			if(relrefidxes[i].size == 4) {
+				*(int*) (code + indexes[relidx + 1] - 4) = offset;
+			} else code[indexes[relidx + 1] - 1] = offset;
+		}
+	}
+
+	if(indexmalloced) free(indexes);
 	return code;
+error:
+	free(code);
+	if(indexmalloced) free(indexes);
+	*len = 0;
+	return NULL;
 }
 
