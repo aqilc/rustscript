@@ -131,11 +131,12 @@ TEST("Parse Problematic \"return 1 - 2 * 3 + 4 ^ 5 = 4\"") {
 
 TEST("Parse Parenthesis \"return 1 + (2 - (3 >> (4) + 5))\"") {
 	struct RS_ParserState* state = parse("test2.rc", "return 1 + (2 - (3 >> (4) + 5));");
+	// Should result in (1 + (2 - ((3 >> 4) + 5)))
 	assert(state != NULL);
 	RS_Stmt* stmt = &state->ast[0];
-	printf("\ndebug: ");
-	debug_expr(stmt->ret);
-	puts("");
+	// printf("\ndebug: ");
+	// debug_expr(stmt->ret);
+	// puts("");
 	expecteq(stmt->type, ST_RETURN);
 	expecteq(stmt->ret->type, EX_REGULAR);
 	expecteq(stmt->ret->tok - state->toks, 2);
@@ -145,27 +146,36 @@ TEST("Parse Parenthesis \"return 1 + (2 - (3 >> (4) + 5))\"") {
 	expecteq(stmt->ret->params[0]->tok->type, TT_INT);
 	expecteq(stmt->ret->params[0]->tok->intv, 1);
 	expecteq(stmt->ret->params[1]->type, EX_REGULAR);
-	expecteq(stmt->ret->params[1]->tok - state->toks, 6);
+	expecteq(stmt->ret->params[1]->tok - state->toks, 5);
 	expecteq(stmt->ret->params[1]->tok->type, TT_OPSUB);
 	expecteq(stmt->ret->params[1]->params[0]->type, EX_PRIM);
 	expecteq(stmt->ret->params[1]->params[0]->tok - state->toks, 4);
 	expecteq(stmt->ret->params[1]->params[0]->tok->type, TT_INT);
 	expecteq(stmt->ret->params[1]->params[0]->tok->intv, 2);
 	expecteq(stmt->ret->params[1]->params[1]->type, EX_REGULAR);
-	expecteq(stmt->ret->params[1]->params[1]->tok - state->toks, 8);
-	expecteq(stmt->ret->params[1]->params[1]->tok->type, TT_OPBSHIFTLEFT);
-	expecteq(stmt->ret->params[1]->params[1]->params[0]->type, EX_PRIM);
-	expecteq(stmt->ret->params[1]->params[1]->params[0]->tok - state->toks, 7);
-	expecteq(stmt->ret->params[1]->params[1]->params[0]->tok->type, TT_INT);
-	expecteq(stmt->ret->params[1]->params[1]->params[0]->tok->intv, 3);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->type, EX_REGULAR);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->tok - state->toks, 10);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->tok->type, TT_OPBSHIFTRIGHT);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->params[0]->type, EX_PRIM);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->params[0]->tok - state->toks, 9);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->params[0]->tok->type, TT_INT);
-	expecteq(stmt->ret->params[1]->params[1]->params[1]->params[0]->tok->intv, 4);
+	expecteq(stmt->ret->params[1]->params[1]->tok - state->toks, 12);
+	expecteq(stmt->ret->params[1]->params[1]->tok->type, TT_OPADD);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->type, EX_REGULAR);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->tok - state->toks, 8);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->tok->type, TT_OPBSHR);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[0]->type, EX_PRIM);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[0]->tok - state->toks, 7);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[0]->tok->type, TT_INT);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[0]->tok->intv, 3);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[1]->type, EX_PRIM);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[1]->tok - state->toks, 10);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[1]->tok->type, TT_INT);
+	expecteq(stmt->ret->params[1]->params[1]->params[0]->params[1]->tok->intv, 4);
+	expecteq(stmt->ret->params[1]->params[1]->params[1]->type, EX_PRIM);
+	expecteq(stmt->ret->params[1]->params[1]->params[1]->tok - state->toks, 13);
+	expecteq(stmt->ret->params[1]->params[1]->params[1]->tok->type, TT_INT);
+	expecteq(stmt->ret->params[1]->params[1]->params[1]->tok->intv, 5);
 	expecteq(state->ast[1].type, ST_EOF);
+
+	BENCH("Parse Parenthesis \"return 1 + (2 - (3 >> (4) + 5))\"") {
+		parse("test2.rc", "return 1 + (2 - (3 >> (4) + 5));");
+		
+	}
 }
 
 #include "tests_end.h"
