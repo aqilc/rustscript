@@ -24,15 +24,15 @@ let c: *bool = &b;
 if hi < 10 {
 	return
 }
-if hi < 10 => return // equivalent
+if hi < 10 return // equivalent
 
-for i in array =>;
-for i of array =>;
-for i in obj =>;
+for i in array {}
+for i of array {}
+for i in obj {}
 
-for i to 10 =>;
-for i from 0 to 10 =>;
-for (let i = 0; i < 10; i ++) =>; // equivalent to above
+for i to 10 {}
+for i from 0 to 10 {}
+for i = 0; i < 10; i ++ {} // equivalent to above
 
 while cond =>;
 while cond {}

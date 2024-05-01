@@ -1,24 +1,35 @@
 # rustscript
 
-A very ambitious project, with the goal of making a combination systems language that tries to combine the main concepts from the languages Typescript and Rust. Aims to be the first systems language to have JSON as a first class citizen. Data types will be simple like C and other than slight ownership, will leave management to the user. Should be usable without types with powerful inference to an extent.
+An ambitious project, with the goal of making a lightweight scripting language that tries to combine the main concepts from the languages Typescript and Rust. Should be usable without types with powerful inference to an extent.
+
+### Goals
+
+- Simple and easy to use syntax
+- Everything should be typed
+- As much type inference as possible
+- Explicit type conversions
+- JSON as a first class citizen
+- Ease of typing and rapid prototyping
+- Compile to .exe, importing types and metadata from .exe.
+- As compatible with C as possible
 
 ### Preliminary Syntax
 
 This syntax is the current goal:
 
-```rust
-struct Datatype { // Syntax is similar to JS classes, but more concise and requires types.
-	number: u32 = 0; // Optionals and defaults in-built.
+```typescript
+class Datatype { // Syntax is similar to JS classes, but more concise and requires types when there are no default values.
+	number: number = 0; // Optionals and defaults in-built.
 	string: string; // Only stores length and capacity with extremely transparent and simple logic and easy conversion to C string.
-	array: u32[]; // All arrays are variable size, contain the same things as strings.
+	array: number[]; // All arrays are variable size, contain the same things as strings.
 	object: { [key: string]: string }; // or record<string, string>
 	object2: {
 		hi: string,
 		[2]: bool // Unlike in Typescript, number keys are possible
 	}; // { ... } type declarations are treated as records, not Structs. If you want to make a struct you have to define it with `struct x {}`.
-	optional?: *Database; // Option types can only be pointers. Type recursion can only be done with pointers.
+	optional?: Database;
 
-	// Struct methods
+	// Class methods
 	print() => print("hello ${this.string}")
 	static hi() => "something"
 }
@@ -27,9 +38,7 @@ struct Datatype { // Syntax is similar to JS classes, but more concise and requi
 
 const obj = {
 	prop: "lol"
-}; // Defines a map or struct depending on if the indexing operator([]) is ever used on it.
-// obj.prop and obj["prop"] will always do completely different things, and the second will always be slower.
-
+};
 
 Datatype {
 	object2: {
@@ -42,7 +51,7 @@ const d = Datatype {
 	string: "world",
 	array: [1, 0],
 	object: {
-		hi: "syntax inside of objects is just like structs"
+		hi: "syntax is the same as js"
 	},
 	object2: {
 		hi: "i really want to finish this project for once",
@@ -55,9 +64,9 @@ print(d.number == 4, d.string.len == 2, d.array.len == 2, "hi" in d.object); // 
 
 
 // ? in front of any type creates an option type, would take no extra memory for pointers.
-const res: ?u32 = [3, 3, 4].find(a => a == 3)
+const res: ?number = [3, 3, 4].find(a => a == 3)
 if res {
-	// Inside this if statement, res's type automatically resolves to u32 and the option type/data is discarded.
+	// Inside this if statement, res's type automatically resolves to number and the option type/data is discarded.
 	print("hoorah we found ${res}")
 }
 print("we can also unwrap types with ? like this: ${res?}")
@@ -68,50 +77,15 @@ fn ez1() => 1;
 const ez1 = () => 1;
 
 fn func1(str: string) { return str; }
-fn func2({ hi: alias }: { hi: string } = { hi: "default" }) => alias
 fn func3(reg: Regex) => reg.exec("hi")
 
 func1("hi")
 func1 "hi"
-func2({ hi: "string" })
-func2 { hi: "string" }
 func3 /rand\w+/g
 ```
 
-### Syntax TODO
-
-- [x] `return 0;`
-	- [x] Basic Tokenizing
-	- [x] Basic AST generation
-	- [x] Basic Code Generation and execution
-  	- [x] x86 Code Generation
-    	- [x] AST Iteration
-    	- [x] Statement -> Assembly
-		- [x] Custom Assembler library
-  		- [x] Assemble Basic instructions like `push rax`
-  		- [x] Prefixes
-  		- [x] Hints
-  		- [ ] Vector EXtension Instructions
-    		- [ ] EVEX
-- [ ] `return 1 + 1;`
-	- [x] Expression Parsing
-		- [ ] Order of Operations
-		- [ ] Unary Operators
-		- [ ] Comma
-  - [ ] x86 Code Generation
-    - [ ] Expression iteration and emitting appropriate instructions
-- [ ] `print("lol");`
-	- [ ] Function Calls
-	- [ ] Linking to the C library / externally defined functions.
-- [ ] `fn main() { return 0; } return main();`
-	- [ ] Function Calls
-	- [ ] Linking to the C library / externally defined functions.
-
 ### Concepts
 
-- Simple Ownership rules
-	- `*` = Mutable pointer, `&` = Immutable Reference
-		- Cannot take multiple `*`s of an object at once.
 - "number" type
   - Will start off as an i64, but will be changed to a double depending on operands. Similar to how JS numbers work.
 - Immutable strings
