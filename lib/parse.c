@@ -20,6 +20,10 @@ enum RS_OpClass {
 	OC_PAREN /* () */
 };
 
+static inline RS_Expr* new_expr(RS_Expr* ex) {
+	return memcpy(malloc(sizeof(RS_Expr)), ex, sizeof(RS_Expr));
+}
+
 static void parse_stmt(struct RS_ParserState*);
 static RS_Expr* parse_expr(struct RS_ParserState* st, enum RS_OpClass highest);
 static RS_Type* parse_type(struct RS_ParserState*);
@@ -39,7 +43,6 @@ struct RS_ParserState* parse(char* file, char* str) {
 	struct RS_ParserState* state = malloc(sizeof(struct RS_ParserState));
 	*state = (struct RS_ParserState) {
 		.ast = vnew(),
-		.expressions = vnew(),
 		.types = vnew(),
 
 		.file = file,
@@ -53,8 +56,8 @@ struct RS_ParserState* parse(char* file, char* str) {
 	while(state->toks[state->ind].type != TT_EOF) parse_stmt(state);
 	vpush(state->ast, { .type = ST_EOF });
 
-	vfor(state->expressions, expr)
-		parse_check(state, expr);
+	// vfor(state->expressions, expr)
+	// 	parse_check(state, expr);
 	
 	return state;
 }
@@ -79,42 +82,42 @@ struct {
 	enum RS_OpClass prec[3];
 	bool right_assoc;
 } precedences[] = {
-	[TT_OPADD]            = { { OC_FORBIDDEN, OC_ADD,       OC_FORBIDDEN } },
-	[TT_OPSUB]            = { { OC_UNARY,     OC_ADD,       OC_FORBIDDEN } },
-	[TT_OPMUL]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
-	[TT_OPDIV]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
-	[TT_OPMOD]            = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
-	[TT_OPPOW]            = { { OC_FORBIDDEN, OC_POW,       OC_FORBIDDEN }, true },
-	[TT_OPBXOR]           = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
-	[TT_OPBOR]            = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
-	[TT_OPBAND]           = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
-	[TT_OPBSHIFTRIGHT]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
-	[TT_OPBSHIFTLEFT]     = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
-	[TT_OPSET]            = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPADDSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPSUBSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPMULSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPDIVSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPMODSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPPOWSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPBXORSET]        = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPBORSET]         = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPBANDSET]        = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPBSHIFTRIGHTSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPBSHIFTLEFTSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
-	[TT_OPDOT]            = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
-	[TT_OPQUESDOT]        = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
-	[TT_OPQUES]           = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
-	[TT_OPINCR]           = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
-	[TT_OPDECR]           = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPADD]     = { { OC_FORBIDDEN, OC_ADD,       OC_FORBIDDEN } },
+	[TT_OPSUB]     = { { OC_UNARY,     OC_ADD,       OC_FORBIDDEN } },
+	[TT_OPMUL]     = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPDIV]     = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPMOD]     = { { OC_FORBIDDEN, OC_MUL,       OC_FORBIDDEN } },
+	[TT_OPPOW]     = { { OC_FORBIDDEN, OC_POW,       OC_FORBIDDEN }, true },
+	[TT_OPBXOR]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBOR]     = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBAND]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBSHR]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPBSHL]    = { { OC_FORBIDDEN, OC_BIT,       OC_FORBIDDEN } },
+	[TT_OPSET]     = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPADDSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPSUBSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPMULSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPDIVSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPMODSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPPOWSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBXORSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBORSET]  = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBANDSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBSHRSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPBSHLSET] = { { OC_FORBIDDEN, OC_ASSIGN,    OC_FORBIDDEN } },
+	[TT_OPDOT]     = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPQUESDOT] = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPQUES]    = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
+	[TT_OPINCR]    = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
+	[TT_OPDECR]    = { { OC_FORBIDDEN, OC_POSTFIX,   OC_FORBIDDEN } },
 
-	[TT_POPENPAR]         = { { OC_PAREN,     OC_FORBIDDEN, OC_FORBIDDEN } },
+	[TT_POPENPAR]  = { { OC_PAREN,     OC_FORBIDDEN, OC_FORBIDDEN } },
 
-	[TT_LNOT]             = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
-	[TT_LOR]              = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
-	[TT_LAND]             = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
-	// [TT_PCOLON]        = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
-	[TT_ERROR]            = { { OC_FORBIDDEN, OC_FORBIDDEN, OC_FORBIDDEN } }, // Just to extend the array size to accomodate all tokens
+	[TT_LNOT]      = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	[TT_LOR]       = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	[TT_LAND]      = { { OC_FORBIDDEN, OC_UNARY,     OC_FORBIDDEN } },
+	// [TT_PCOLON] = { { OC_FORBIDDEN, OC_TERTIARY,  OC_FORBIDDEN } },
+	[TT_ERROR]     = { { OC_FORBIDDEN, OC_FORBIDDEN, OC_FORBIDDEN } }, // Just to extend the array size to accomodate all tokens
 };
 
 /*
@@ -136,34 +139,30 @@ struct {
  *           2
  */
 static RS_Expr* parse_expr(struct RS_ParserState* st, enum RS_OpClass highest) {
-	vpush(st->expressions, {});
 	int parens = 0;
-	int depth = 1;
+	int depth = 0;
 	static RS_Expr* curexpr[1000] = {};
-	RS_Expr* prim = curexpr[0] = vlast(st->expressions);
 
 primary:
-	prim->tok = st->toks + st->ind;
+	curexpr[depth] = new_expr(&(RS_Expr) {});
+	curexpr[depth]->tok = st->toks + st->ind;
+	if(depth) curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = curexpr[depth];
 	switch(st->toks[st->ind++].type) {
 	case TT_IDENT:
 	case TT_FLOAT:
 	case TT_STRING:
 	case TT_INT:
-		prim->type = EX_PRIM;
-		curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = prim;
+		curexpr[depth]->type = EX_PRIM;
 		break;
 	case TT_POPENPAR:
 		parens ++;
 	case TT_OPBNOT:
 	case TT_OPSUB:
 	case TT_OPADD:
-		vpush(st->expressions, {
-			.type = EX_REGULAR,
-			.tok = st->toks + st->ind - 1,
-			.paramnum = 0,
-		});
-		curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = vlast(st->expressions);
-		curexpr[depth++] = vlast(st->expressions);
+		curexpr[depth]->type = EX_REGULAR;
+		depth ++;
+		curexpr[depth] = new_expr(&(RS_Expr) {});
+		curexpr[depth - 1]->params[0] = curexpr[depth];
 		goto primary;
 	case TT_PSEMICOLON:
 	case TT_EOF:
@@ -176,26 +175,6 @@ primary:
 	RS_Token* op = st->toks + st->ind;
 
 detectparens:
-	if (op->type == TT_PCLOSEPAR) {
-		if(parens) {
-			// error("Expected an expression here (got %s) (debug: resolving %s, %s)", toktostr[st->toks[st->ind - 1].type], toktostr[curexpr[depth - 1]->tok->type], toktostr[curexpr[depth - 2]->tok->type]);
-			// debug_expr(curexpr[0]); printf("   ");
-			op = st->toks + ++st->ind;
-			parens --;
-			while(depth > 1 && curexpr[depth - 1]->tok->type != TT_POPENPAR)
-				depth --;
-			depth --;
-			if(depth > 0) curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = curexpr[depth]->params[0], prim = curexpr[depth - 1];
-			else prim = curexpr[depth];
-			// error("Expected an expression here (got %s) (debug: resolving %s, %s)", toktostr[st->toks[st->ind - 1].type], toktostr[curexpr[depth - 1]->tok->type], toktostr[curexpr[depth]->tok->type]);
-			// debug_expr(curexpr[depth]);
-			goto detectparens;
-		} else {
-			error("Unexpected closing parenthesis");
-			return NULL;
-		}
-	}
-
 	if (op->type == TT_PSEMICOLON ||
 			op->type == TT_EOF) {
 		
@@ -205,29 +184,42 @@ detectparens:
 		}
 
 		return curexpr[0];
+	} else if (op->type == TT_PCLOSEPAR) {
+		if(parens) {
+
+			while(depth > 1 && curexpr[depth - 1]->tok->type != TT_POPENPAR) depth --;
+			depth --;
+			parens --;
+			op = st->toks + ++st->ind;
+			
+			if(depth > 0)
+				curexpr[depth - 1]->params[curexpr[depth - 1]->paramnum] = curexpr[depth]->params[0];
+			
+			goto detectparens;
+		}
+		
+		error("Unexpected closing parenthesis");
+		return NULL;
 	}
 
-	if(highest && precedences[op->type].prec[1] > highest) {
-		st->ind--;
-		return curexpr[0];
-	}
+	// if(highest && precedences[op->type].prec[1] > highest) {
+	// 	st->ind--;
+	// 	return curexpr[0];
+	// }
 
 	// Go up the operator hierarchy chain, and swap the operator that has the higher precedence with the one that has lower precedence
 	if(precedences[op->type].prec[1]) {
 		st->ind++;
-		
-		vpusharr(st->expressions, {{
+
+		RS_Expr* opexpr = new_expr(&(RS_Expr) {
 			.type = EX_REGULAR,
 			.tok = op,
 			.paramnum = 1,
-		}, {}});
+		});
 
-		RS_Expr* opexpr = vlast(st->expressions) - 1;
-		RS_Expr* tempprim = prim;
-		prim = vlast(st->expressions);
 
 		// If the operator is of a higher order than the current top operator, make it the new top operator
-		if(!parens && precedences[curexpr[0]->tok->type].prec[curexpr[0]->paramnum] <= precedences[op->type].prec[curexpr[0]->paramnum]) {
+		if(!depth || (!parens && precedences[curexpr[0]->tok->type].prec[curexpr[0]->paramnum] <= precedences[op->type].prec[curexpr[0]->paramnum])) {
 			opexpr->params[0] = curexpr[0];
 			depth = 1;
 			curexpr[0] = opexpr;

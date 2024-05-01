@@ -78,7 +78,7 @@ struct RS_Stmt {
 
 struct RS_ParserState {
 	RS_Stmt* ast;
-	RS_Expr* expressions;
+	// RS_Expr* expressions; // they're kinda trees so it doesn't work
 	RS_Type* types;
 
 	RS_Stmt* scope;
