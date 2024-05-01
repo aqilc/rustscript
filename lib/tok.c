@@ -1,5 +1,9 @@
 #include <stdlib.h>
 
+/**
+ * TODO: ASI: https://stackoverflow.com/questions/2846283/what-are-the-rules-for-javascripts-automatic-semicolon-insertion-asi
+ */
+
 #define VEC_H_STATIC_INLINE
 #include <vec.h>
 #include <hash.h>
@@ -18,8 +22,8 @@ char* toktostr[] = {
 	[TT_OPBXOR] = "^",
 	[TT_OPBOR] = "|",
 	[TT_OPBAND] = "&",
-	[TT_OPBSHIFTRIGHT] = ">>",
-	[TT_OPBSHIFTLEFT] = "<<",
+	[TT_OPBSHR] = ">>",
+	[TT_OPBSHL] = "<<",
 	[TT_OPADDSET] = "+=",
 	[TT_OPSUBSET] = "-=",
 	[TT_OPMULSET] = "*=",
@@ -29,8 +33,8 @@ char* toktostr[] = {
 	[TT_OPBXORSET] = "^=",
 	[TT_OPBORSET] = "|=",
 	[TT_OPBANDSET] = "&=",
-	[TT_OPBSHIFTRIGHTSET] = ">>=",
-	[TT_OPBSHIFTLEFTSET] = "<<=",
+	[TT_OPBSHRSET] = ">>=",
+	[TT_OPBSHLSET] = "<<=",
 	[TT_OPBNOT] = "~",
 	[TT_OPDOT] = ".",
 	[TT_OPQUESDOT] = "?.",
@@ -75,17 +79,18 @@ char* toktostr[] = {
 	[TT_TI32] = "i32",
 	[TT_TI64] = "i64",
 	[TT_TBOOL] = "bool",
-	[TT_IDENT] = "",
-	[TT_INT] = "",
-	[TT_FLOAT] = "",
-	[TT_STRING] = "",
-	[TT_EOF] = "",
-	[TT_ERROR] = "",
+	[TT_IDENT] = "an identifier",
+	[TT_INT] = "a number",
+	[TT_FLOAT] = "a number",
+	[TT_STRING] = "a string",
+	[TT_EOF] = "EOF",
+	[TT_ERROR] = "ERROR",
 };
 
 ht(char*, RS_TokenType) keywords;
 hentry(keywords) keywordinit[] = {
 	{ "let",    TT_KLET    },
+	{ "const",  TT_KCONST  },
 	{ "fn",     TT_KFN     },
 	{ "struct", TT_KSTRUCT },
 	{ "if",     TT_KIF     },
@@ -107,16 +112,17 @@ hentry(keywords) keywordinit[] = {
 
 static inline u32 utf8(u8** str) {
 	if(**str == 0) return 0;
-	u32 code_point = 0;
 
 	int len =
 		**str > 0x80 ? // 0b10000000
-			(**str & 0xE0) == 0xE0 ? 2 : // 0b11100000
-				(**str & 0xC0) == 0xC0 ? 1 : 3 // 0b11000000
+			(**str & 0xF0) == 0xF0 ? 3 : // 0b11110000
+				(**str & 0xE0) == 0xE0 ? 2 : // 0b11100000
+					(**str & 0xC0) == 0xC0 ? 1 : 3 // 0b11000000
 		: 0;
 
-	if(len > 0) **str <<= len + 2, **str >>= len + 2;
-	code_point += *(*str)++;
+	if(len > 0) **str &= (4 << (4 - len)) - 1;
+	else return *(*str)++;
+	u32 code_point = *(*str)++;
 	while (len--) code_point = code_point << 6 | (*(*str)++ & 0x3F);
 	return code_point;
 }
@@ -139,6 +145,7 @@ RS_Token* tokenize(char* str) {
 	bool dot = false;
 	bool plus = false;
 	bool minus = false;
+	int prev = 0;
 
 	u32 point = 0;
 	while ((point = utf8((u8**) &str))) {
@@ -148,19 +155,24 @@ RS_Token* tokenize(char* str) {
 
 		if(num(point)) {
 			int64_t intv = point - '0';
-			if(minus) intv = -0;
 			if(plus) plus = false;
-			if(dot) goto float_parse;
+			if(dot) {
+				if(minus) intv = -intv;
+				dot = false;
+				goto float_parse;
+			}
 
 			// Read in integer/front part of float
 			char* lasttok = str;
 			while (num((point = utf8((u8**) &str))))
 				lasttok = str, intv = intv * 10 + (point - '0');
+			
+			if(minus) intv = -intv;
 
 			if(point == '.') {
 			float_parse:;
 				double floatv = (double) intv;
-				double dec = 0.1;
+				double dec = intv < 0 ? -0.1 : 0.1;
 
 				while (num((point = utf8((u8**) &str))))
 					lasttok = str, floatv += (point - '0') * (dec *= 0.1);
@@ -170,6 +182,8 @@ RS_Token* tokenize(char* str) {
 			}
 			else vpush(ret, { .intv = intv, .type = TT_INT, .place = str - start, .len = str - tokstart + !point });
 			str = lasttok;
+			minus = false;
+			dot = false;
 			continue;
 		}
 		else if(dot) { dot = false; op(TT_OPDOT, 1); }
@@ -186,8 +200,6 @@ RS_Token* tokenize(char* str) {
 			data = malloc(len + 1);
 			data[len] = 0;
 			memcpy(data, str - len - !!point, len);
-			
-			// printf("\n%s, %s: %s, %d len", start, str, data, len);
 
 			RS_TokenType* res = hgets(keywords, data);
 			if(res) //printf("whoa got a keyword\n"),
@@ -207,7 +219,6 @@ RS_Token* tokenize(char* str) {
 			char* data = malloc(len + 1);
 			data[len] = 0;
 			memcpy(data, str - len - !!point, len);
-			// printf("\n%s, %s: %s, %d len", start, str, data, len);
 			
 			vpush(ret, { .type = TT_STRING, .data = data, .len = len, .place = str - start });
 			continue;
@@ -223,6 +234,7 @@ RS_Token* tokenize(char* str) {
 		case ';': op(TT_PSEMICOLON, 1); continue;
 		case ',': op(TT_PCOMMA, 1); continue;
 		case ':': op(TT_PCOLON, 1); continue;
+		// case '?': op(TT_OPQUES, 1); continue;
 		case '.': dot = true; continue;
 		}
 
@@ -241,49 +253,51 @@ RS_Token* tokenize(char* str) {
 		case '+':
 			if (peek == '+') op(TT_OPINCR, 2);
 			else if(peek == '=') op(TT_OPADDSET, 2);
-			else if(vlen(ret) && isop(vlast(ret)->type)) plus = true;
-			else op(TT_OPADD, 1);
+			else if(vlen(ret) && isop(vlast(ret)->type)) { plus = true; str = tokstart2; }
+			else { op(TT_OPADD, 1); str = tokstart2; }
 			continue;
 		case '-':
 			if (peek == '-') op(TT_OPDECR, 2);
 			else if(peek == '=') op(TT_OPSUBSET, 2);
-			else if(vlen(ret) && isop(vlast(ret)->type)) minus = true;
-			else op(TT_OPSUB, 1);
+			else if(vlen(ret) && isop(vlast(ret)->type)) { minus = true; str = tokstart2; }
+			else { op(TT_OPSUB, 1); str = tokstart2; }
 			continue;
-		}
-
-		if(t && peek == '=') { op(t + TT_OPADDSET - TT_OPADD, 2); continue; }
-		else if(t) { op(t, 1); str = tokstart2; continue; }
-		
-		if(point == '!') {
+		case '!':
 			if (peek == '=') op(TT_CNOTEQ, 2);
 			else { op(TT_LNOT, 1); str = tokstart2; }
 			continue;
-		} else if (point == '=') {
+		case '=':
 			if (peek == '>') op(TT_PARROW, 2);
 			else if (peek == '=') op(TT_CEQ, 2);
 			else { op(TT_OPSET, 1); str = tokstart2; }
 			continue;
 		}
 
+		if(t && peek == '=') { op(t + TT_OPADDSET - TT_OPADD, 2); continue; }
+		else if(t) { op(t, 1); str = tokstart2; continue; }
+
 		char* tokstart3 = str;
 		u32 peek2 = utf8((u8**) &str);
 		switch(point) {
 		case '<':
-			if (peek == '=') op(TT_CLESSEQ, 2);
+			if (peek == '=') { op(TT_CLESSEQ, 2); str = tokstart3; }
 			else if (peek == '<') {
-				if (peek2 == '=') op(TT_OPBSHIFTLEFTSET, 3);
-				else { op(TT_OPBSHIFTLEFT, 2); str = tokstart3; }
+				if (peek2 == '=') op(TT_OPBSHLSET, 3);
+				else { op(TT_OPBSHL, 2); str = tokstart3; }
 			}
 			else { op(TT_CLESS, 1); str = tokstart2; }
 			continue;
 		case '>':
-			if (peek == '=') op(TT_CGREATEQ, 2);
+			if (peek == '=') { op(TT_CGREATEQ, 2); str = tokstart3; }
 			else if (peek == '>') {
-				if (peek2 == '=') op(TT_OPBSHIFTRIGHTSET, 3);
-				else { op(TT_OPBSHIFTRIGHT, 2); str = tokstart3; }
+				if (peek2 == '=') op(TT_OPBSHRSET, 3);
+				else { op(TT_OPBSHR, 2); str = tokstart3; }
 			}
 			else { op(TT_CGREATER, 1); str = tokstart2; }
+			continue;
+		case '?':
+			if(peek == '.' && !num(peek2)) { op(TT_OPQUESDOT, 2); str = tokstart3; }
+			else { op(TT_OPQUES, 1); str = tokstart2; }
 			continue;
 		}
 
