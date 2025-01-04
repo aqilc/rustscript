@@ -59,6 +59,7 @@ build
 .vs
 .vscode
 *.raddbg*
+*.rdi
 *.tmp*
 main*.idx
 main*.run
