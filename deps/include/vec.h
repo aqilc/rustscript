@@ -80,8 +80,8 @@ struct vecdata_ {
 // Pops off the last element and returns it
 #ifdef VEC_H_MORE_MACROS
 	#define vpop(x) (_DATA(x)->data + (_DATA(x)->used -= sizeof(*(x))))
-	#define vpopn(x, n) (_DATA(x)->data + (_DATA(x)->used -= (n) * sizeof(*(x)))
-	#define vpopto(x, idx) (_DATA(x)->data + (_DATA(x)->used = (idx) * sizeof(*(x)))
+	#define vpopn(x, n) (_DATA(x)->data + (_DATA(x)->used -= (n) * sizeof(*(x))))
+	#define vpopto(x, idx) (_DATA(x)->data + (_DATA(x)->used = (idx) * sizeof(*(x))))
 	#define vempty(x) (_DATA(x)->data + (_DATA(x)->used = 0))
 	#define vfree(x) VEC_H_FREE(_DATA(x))
 #else
@@ -94,7 +94,7 @@ struct vecdata_ {
 #define vremove(x, idx) vremove_((x), sizeof(*(x)), (idx))
 
 // Pointer to the last element of the vector
-#define vlast(x) ((x) + vlen(x) - 1)
+#define vlast(x) ((typeof(x)) ((char*)(x) + _DATA(x)->used) - 1)
 
 // Prealloc more space before setting elements.
 #define vprealloc(x, n) vpush_((void**)&(x), sizeof(*(x)) * (n))
