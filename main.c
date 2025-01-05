@@ -1,23 +1,18 @@
-// Threading library
-// https://github.com/tinycthread/tinycthread
 #include <stdio.h>
-#include "lib/asm/asm_x86.h"
-
-void print() {
-	printf("HI!!!");
-}
+#include "lib/asm/asm_x64.h"
 
 int main() {
-	x64 hi2 = {
-		// INT3, {},
-		MOV, {rax, im64((u64)(void*)print)},
-		CALL, {rax},
-		END
+	char* str = "Hello World!";
+	x64 code = {
+		{ MOV, rax, imfn(puts) },
+		{ MOV, rcx, imfn(str) },
+		{ CALL, rax },
 	};
 	
-	u32 len = 0;
-	char* assembled = x64as(hi2, &len);
-	run(assembled, len)(); // prints "HI!!!"
-
+	uint32_t len = 0;
+	uint8_t* assembled = x64as(code, sizeof(code) / sizeof(code[0]), &len);
+	if(!len) return 1;
+	
+	x64_exec(assembled, len)();
 	return 0;
 }
