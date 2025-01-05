@@ -74,7 +74,8 @@ clean:
 	$(FILEDELETE) *.pdb
 	$(FILEDELETE) *.obj
 	$(FILEDELETE) *.ilk
-	$(FILEDELETE) *.raddbg
+	$(FILEDELETE) *.raddbg*
+	$(FILEDELETE) *.rdi
 	$(FILEDELETE) *.idx
 	$(FILEDELETE) gmon.out
 
@@ -108,32 +109,32 @@ bf: bf$(EXEEND)
 tok$(EXEEND): toktest$(OBJEND) tok$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-asm$(EXEEND): asmtest$(OBJEND) asm_x86$(OBJEND)
+asm$(EXEEND): asmtest$(OBJEND) asm_x64$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 parse$(EXEEND): parsetest$(OBJEND) parse$(OBJEND) tok$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-x86$(EXEEND): x86test$(OBJEND) x86$(OBJEND) coderun$(OBJEND) asm_x86$(OBJEND) tok$(OBJEND) parse$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
+x86$(EXEEND): x86test$(OBJEND) x86$(OBJEND) coderun$(OBJEND) asm_x64$(OBJEND) tok$(OBJEND) parse$(OBJEND) error$(OBJEND) hashfunc$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
-bf$(EXEEND): bftest$(OBJEND) coderun$(OBJEND) asm_x86$(OBJEND)
+bf$(EXEEND): bftest$(OBJEND) asm_x64$(OBJEND)
 	@$(CC) $^ $(EXENAME)$@ $(LINK)
 
 # ============= Test Builds =============
 toktest$(OBJEND): tok.c ../lib/tok.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-asmtest$(OBJEND): asm.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
+asmtest$(OBJEND): asm.c ../lib/asm/asm_x64.c ../lib/asm/asm_x64.h $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 parsetest$(OBJEND): parse.c ../lib/parse.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-x86test$(OBJEND): x86.c ../lib/backends/x86.c ../lib/asm/coderun.c ../lib/asm/coderun.h ../lib/backends/x86.h ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h ../lib/parse.c $(TESTSUITE)
+x86test$(OBJEND): x86.c ../lib/backends/x86.c ../lib/asm/coderun.c ../lib/asm/coderun.h ../lib/backends/x86.h ../lib/asm/asm_x64.c ../lib/asm/asm_x64.h ../lib/parse.c $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
-bftest$(OBJEND): bf.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
+bftest$(OBJEND): bf.c ../lib/asm/asm_x64.c ../lib/asm/asm_x64.h $(TESTSUITE)
 	$(CC) $(TCFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # ----------- Base lib builds ------------
@@ -159,7 +160,7 @@ bftest$(OBJEND): bf.c ../lib/asm/asm_x86.c ../lib/asm/asm_x86.h $(TESTSUITE)
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 # error$(OBJEND): ../lib/error.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
-# asm$(OBJEND): ../lib/asm/asm_x86.c
+# asm$(OBJEND): ../lib/asm/asm_x64.c
 # 	$(CC) $(CFLAGS) $(OUTPUTFILENAME)$@ $(COMPILEFLAG) $<
 
 # parse$(OBJEND): ../lib/parse.c
