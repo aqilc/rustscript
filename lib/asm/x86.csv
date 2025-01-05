@@ -526,9 +526,9 @@ VEX.NDS.256.66.0F3A.WIG 40 /r ib	VDPPS ymm1, ymm2, ymm3/m256, imm8	RVMI	W, R, R,
 														
 0F 77	EMMS	NP			TAG(*)				V	V		emms		Set the x87 FPU tag word to empty.
 														
-C8 ib iw	ENTER 0, imm16	II	R, R	???	???	???			V	V		enterq		Create a stack frame for a procedure.
-C8 ib iw	ENTER 1, imm16	II	R, R	???	???	???			V	V		enterq		Create a nested stack frame for a procedure.
-C8 ib iw	ENTER imm8, imm16	II	R, R	???	???	???			V	V		enterq		Create a nested stack frame for a procedure.
+C8 iw ib	ENTER imm16, 0	II	R, R	???	???	???			V	V		enterq		Create a stack frame for a procedure.
+C8 iw ib	ENTER imm16, 1	II	R, R	???	???	???			V	V		enterq		Create a nested stack frame for a procedure.
+C8 iw ib	ENTER imm16, imm8	II	R, R	???	???	???			V	V		enterq		Create a nested stack frame for a procedure.
 														
 66 0F 3A 17 /r ib	EXTRACTPS reg/m32, xmm2, imm8	MRI	W, R, R						V	V	SSE4_1	extractps		Extract a single-precision floating-point value from xmm2 at the source offset specified by imm8 and store the result to reg or m32. The upper 32 bits of r64 is zeroed if reg is r64.
 VEX.128.66.0F3A.WIG 17 /r ib	VEXTRACTPS r/m32, xmm1, imm8	MRI	W, R, R						V	V	AVX	vextractps		Extract one single-precision floating-point value from xmm1 at the offset specified by imm8 and store the result in reg or m32. Zero extend the results in 64-bit register if applicable.
@@ -1065,9 +1065,9 @@ B8 +rd	MOV r32, imm32	OI	W, R						V	V		movl	YES	Move imm32 to r32.
 REX.W+ B8 +rd	MOV r64, imm64	OI	W, R						V	NE		movq		Move imm64 to r64.
 C6 /0	MOV r/m8, imm8	MI	W, R						V	V		movb		Move imm8 to r/m8.
 REX+ C6 /0	MOV r/m8, imm8	MI	W, R						V	NE		movb		Move imm8 to r/m8.
-C7 /0	MOV r/m16, imm16	MI	W, R						V	V		movw		Move imm16 to r/m16.
-C7 /0	MOV r/m32, imm32	MI	W, R						V	V		movl		Move imm32 to r/m32.
-REX.W+ C7 /0	MOV r/m64, imm32	MI	W, R						V	NE		movq	YES	Move imm32 sign extended to 64-bits to r/m64.
+C7 /0 iw	MOV r/m16, imm16	MI	W, R						V	V		movw		Move imm16 to r/m16.
+C7 /0 id	MOV r/m32, imm32	MI	W, R						V	V		movl		Move imm32 to r/m32.
+REX.W+ C7 /0 id	MOV r/m64, imm32	MI	W, R						V	NE		movq	YES	Move imm32 sign extended to 64-bits to r/m64.
 														
 0F 20 /r	MOV r32, CR0-CR7						NO	YES	NE	V				Move control register to r32.
 0F 20 /r	MOV r64, CR0-CR7						NO	YES	V	NE				Move extended control register to r64.
@@ -1925,9 +1925,9 @@ FF /6	PUSH r/m64	M	R	RSP	RSP				V	NE		pushq		Push r/m64.
 50 +rd	PUSH r32			RSP	RSP				NE	V				Push r32.
 50 +rd	PUSH r64	O	R	RSP	RSP				V	NE		pushq	YES	Push r64.
 6A	PUSHQ imm8	I	R	RSP	RSP				V	V		pushq		Push imm8 (sign-extended to 64-bits).
-66 6A	PUSHW imm8	I	R	RSP	RSP				V	V		pushw		Push imm8 (sign-extended to 16-bits).
+66 6A ib	PUSHW imm8	I	R	RSP	RSP				V	V		pushw		Push imm8 (sign-extended to 16-bits).
 68	PUSHQ imm16	I	R	RSP	RSP				V	V		pushq		Push imm16 (sign-extended to 64-bits).
-66 68	PUSHW imm16	I	R	RSP	RSP				V	V		pushw		Push imm16 (sign-extended to 16-bits).
+66 68 iw	PUSHW imm16	I	R	RSP	RSP				V	V		pushw		Push imm16 (sign-extended to 16-bits).
 68	PUSHQ imm32	I	R	RSP	RSP				V	V		pushq		Push imm32 (sign-extended to 64-bits).
 0E	PUSH CS			RSP	RSP				I	V				Push CS.
 16	PUSH SS			RSP	RSP				I	V				Push SS.
@@ -2275,7 +2275,7 @@ REX+ 0F 94 /0	SETZ r/m8	M	W	E.ZF					V	NE		setz		Set byte if zero (ZF=1).
 														
 0F AE F8	SFENCE	NP							V	V		sfence		Serializes store operations.
 														
-0F 01 /0	SGDT m						NO	NO	V	V				Store GDTR to m.
+0F 01 /0	SGDT m	M					NO	NO	V	V				Store GDTR to m.
 														
 0F A4	SHLD r/m16, r16, imm8	MRI	Rwu, R, R		e.cf e.sf e.zf e.pf	e.of e.sf e.zf e.af e.cf e.pf			V	V		shldw		Shift r/m16 to left imm8 places while shifting bits from r16 in from the right.
 0F A5	SHLD r/m16, r16, CL	MRC	Rwu, R, R		e.cf e.sf e.zf e.pf	e.of e.sf e.zf e.af e.cf e.pf			V	V		shldw		Shift r/m16 to left CL places while shifting bits from r16 in from the right.
@@ -2299,14 +2299,14 @@ VEX.NDS.256.66.0F.WIG C6 /r ib	VSHUFPD ymm1, ymm2, ymm3/m256, imm8	RVMI	W, R, R,
 VEX.NDS.128.0F.WIG C6 /r ib	VSHUFPS xmm1, xmm2, xmm3/m128, imm8	RVMI	Z, R, R, R						V	V	AVX	vshufps		Shuffle Packed single-precision floating-point values selected by imm8 from xmm2 and xmm3/mem.
 VEX.NDS.256.0F.WIG C6 /r ib	VSHUFPS ymm1, ymm2, ymm3/m256, imm8	RVMI	W, R, R, R						V	V	AVX	vshufps		Shuffle Packed single-precision floating-point values selected by imm8 from ymm2 and ymm3/mem.
 														
-0F 01 /1	SIDT m						NO	NO	V	V				Store IDTR to m.
+0F 01 /1	SIDT m	M					NO	NO	V	V				Store IDTR to m.
 														
-0F 00 /0	SLDT r/m16						NO	NO	V	V				Stores segment selector from LDTR in r/m16.
-REX.W+ 0F 00 /0	SLDT r64/m16						NO	NO	V	V				Stores segment selector from LDTR in r64/m16.
+0F 00 /0	SLDT r/m16	M					NO	NO	V	V				Stores segment selector from LDTR in r/m16.
+REX.W+ 0F 00 /0	SLDT r64/m16	M					NO	NO	V	V				Stores segment selector from LDTR in r64/m16.
 														
-0F 01 /4	SMSW r/m16						NO*	NO	V	V				Store machine status word to r/m16.
-0F 01 /4	SMSW r32/m16						NO*	NO	V	V				Store machine status word in low-order 16 bits of r32/m16; high-order 16 bits of r32 are undefined.
-REX.W+ 0F 01 /4	SMSW r64/m16						NO*	NO	V	V				Store machine status word in low-order 16 bits of r64/m16; high-order 16 bits of r32 are undefined.
+0F 01 /4	SMSW r/m16	M					NO*	NO	V	V				Store machine status word to r/m16.
+0F 01 /4	SMSW r32/m16	M					NO*	NO	V	V				Store machine status word in low-order 16 bits of r32/m16; high-order 16 bits of r32 are undefined.
+REX.W+ 0F 01 /4	SMSW r64/m16	M					NO*	NO	V	V				Store machine status word in low-order 16 bits of r64/m16; high-order 16 bits of r32 are undefined.
 														
 66 0F 51 /r	SQRTPD xmm1, xmm2/m128	RM	W, R						V	V	SSE2	sqrtpd		Computes square roots of the packed double- precision floating-point values in xmm2/m128 and stores the results in xmm1.
 VEX.128.66.0F.WIG 51 /r	VSQRTPD xmm1, xmm2/m128	RM	Z, R						V	V	AVX	vsqrtpd		Computes Square Roots of the packed double- precision floating-point values in xmm2/m128 and stores the result in xmm1.
@@ -2424,7 +2424,7 @@ VEX.NDS.256.66.0F.WIG 15 /r	VUNPCKHPD ymm1, ymm2, ymm3/m256	RVM	W, R, R						V	V
 														
 0F 15 /r	UNPCKHPS xmm1, xmm2/m128	RM	RW, R						V	V	SSE	unpckhps		Unpacks and Interleaves single-precision floating-point values from high quadwords of xmm1 and xmm2/mem into xmm1.
 VEX.NDS.128.0F.WIG 15 /r	VUNPCKHPS xmm1, xmm2, xmm3/m128	RVM	Z, R, R						V	V	AVX	vunpckhps		Unpacks and Interleaves single-precision floating-point values from high quadwords of xmm2 and xmm3/m128.
-VEX.NDS.256.0F.WIG 15 /r	VUNPCKHPS ymm1, ymm2,ymm3/m256	RVM	W, R, R						V	V	AVX	vunpckhps		Unpacks and Interleaves single-precision floating-point values from high quadwords of ymm2 and ymm3/m256.
+VEX.NDS.256.0F.WIG 15 /r	VUNPCKHPS ymm1, ymm2, ymm3/m256	RVM	W, R, R						V	V	AVX	vunpckhps		Unpacks and Interleaves single-precision floating-point values from high quadwords of ymm2 and ymm3/m256.
 														
 66 0F 14 /r	UNPCKLPD xmm1, xmm2/m128	RM	RW, R						V	V	SSE2	unpcklpd		Unpacks and Interleaves double-precision floating-point values from low quadwords of xmm1 and xmm2/m128.
 VEX.NDS.128.66.0F.WIG 14 /r	VUNPCKLPD xmm1, xmm2, xmm3/m128	RVM	Z, R, R						V	V	AVX	vunpcklpd		Unpacks and Interleaves double precision floating-point values low high quadwords of xmm2 and xmm3/m128.
@@ -2432,7 +2432,7 @@ VEX.NDS.256.66.0F.WIG 14 /r	VUNPCKLPD ymm1, ymm2, ymm3/m256	RVM	W, R, R						V	V
 														
 0F 14 /r	UNPCKLPS xmm1, xmm2/m128	RM	RW, R						V	V	SSE	unpcklps		Unpacks and Interleaves single-precision floating-point values from low quadwords of xmm1 and xmm2/mem into xmm1.
 VEX.NDS.128.0F.WIG 14 /r	VUNPCKLPS xmm1, xmm2, xmm3/m128	RVM	Z, R, R						V	V	AVX	vunpcklps		Unpacks and Interleaves single-precision floating-point values from low quadwords of xmm2 and xmm3/m128.
-VEX.NDS.256.0F.WIG 14 /r	VUNPCKLPS ymm1, ymm2,ymm3/m256	RVM	W, R, R						V	V	AVX	vunpcklps		Unpacks and Interleaves single-precision floating-point values from low quadwords of ymm2 and ymm3/m256.
+VEX.NDS.256.0F.WIG 14 /r	VUNPCKLPS ymm1, ymm2, ymm3/m256	RVM	W, R, R						V	V	AVX	vunpcklps		Unpacks and Interleaves single-precision floating-point values from low quadwords of ymm2 and ymm3/m256.
 														
 VEX.128.66.0F38.W0 18 /r	VBROADCASTSS xmm1, m32	RM	Z, R						V	V	AVX	vbroadcastss		Broadcast single-precision floating-point element in mem to four locations in xmm1.
 VEX.256.66.0F38.W0 18 /r	VBROADCASTSS ymm1, m32	RM	W, R						V	V	AVX	vbroadcastss		Broadcast single-precision floating-point element in mem to eight locations in ymm1.
@@ -2693,8 +2693,8 @@ REX+ 0F C0 /r	XADD r/m8, r8	MR	RW, RW		E.OF E.SF E.ZF E.AF E.CF E.PF				V	NE		xa
 0F C1 /r	XADD r/m32, r32	MR	RW, RW		E.OF E.SF E.ZF E.AF E.CF E.PF				V	V		xaddl		Exchange r32 and r/m32; load sum into r/m32.
 REX.W+ 0F C1 /r	XADD r/m64, r64	MR	RW, RW		E.OF E.SF E.ZF E.AF E.CF E.PF				V	NE		xaddq		Exchange r64 and r/m64; load sum into r/m64.
 														
-C7 F8	XBEGIN rel16	A	R						NS	V	RTM	xbegin		Specifies the start of an RTM region. Provides a 16-bit relative offset to compute the address of the fallback instruction address at which execution resumes following an RTM abort.
-C7 F8	XBEGIN rel32	A	R						V	V	RTM	xbegin		Specifies the start of an RTM region. Provides a 32-bit relative offset to compute the address of the fallback instruction address at which execution resumes following an RTM abort.
+C7 F8 cw	XBEGIN rel16	A	R						NS	V	RTM	xbegin		Specifies the start of an RTM region. Provides a 16-bit relative offset to compute the address of the fallback instruction address at which execution resumes following an RTM abort.
+C7 F8 cd	XBEGIN rel32	A	R						V	V	RTM	xbegin		Specifies the start of an RTM region. Provides a 32-bit relative offset to compute the address of the fallback instruction address at which execution resumes following an RTM abort.
 														
 90 +rw	XCHG AX, r16	O	RW, RW						V	V		xchgw		Exchange r16 with AX.
 90 +rw	XCHG r16, AX	O	RW, RW						V	V		xchgw		Exchange AX with r16.
