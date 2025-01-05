@@ -1,219 +1,4 @@
-import { readFileSync as read, writeFileSync as write } from "fs";
-
-/**
- * Written like a piece of shit with no optimizations but still runs in like a couple milliseconds so I don't care
- * References:
- * 	- Vex Instruction Construction:
- * 		- Codegen.hs:1320
- * Notes:
- * 	- Provide special cases for LHS, LSS, and LGS in the first for loop that expands the opcodes
- */
-
-// Putting anything in for the first argument disables descriptions.
-const desc_strings = !process.argv[2];
-let file = (read("x86.csv") + '')
-	.split("\r\n").filter(s => s.trim());
-// [0] Opcode  [1] Instruction  [2] Op/En  [3] Properties  [4] Implicit Read  [5] Implicit Write  [6] Implicit Undef  [7] Useful  [8] Protected  [9] 64-bit Mode  [10] Compat/32-bit-Legacy Mode  [11] CPUID Feature Flags  [12] AT&T Mnemonic  [13] Preferred  [14] Description
-
-const rows = file.slice(1).map(s => s.split("\t"));
-// const atntnames = new Set(rows.filter(s => s[12]).map(s => ['b', 'w', 'l', 'q'].includes(s[12][s[12].length - 1]) ? s[12].slice(0, -1) : s[12]));
-const instruction_variants = {};
-
-let const_prefixes = new Set(["F2", "F3", "9B"]);
-
-const operand_types = str => {
-	if(Array.isArray(str)) return str;
-	if(str.includes("/")) {
-		let [a, b] = str.split("/");
-		if(a === "r" && b.startsWith("m")) return "R" + b.slice(1) + " | " + "M" + b.slice(1);
-		// console.log("expanding", a, b);
-		// The "|" is fine because most of the instructions that have something like m16 (requiring pref66) are usually SSE or VEX, which don't have a prefix 66
-		return operand_types(a) + " | " + operand_types(b); // Recursively expands reg and mm if needed.
-	}
-	if(str === "<xmm0>") return "XMM_0";
-	let mm = str.match(/^([xy]?)mm/)?.[1];
-	if(mm !== undefined) return mm.toUpperCase() + "MM";
-	if(str.startsWith("m16") && (str[3] === "&" || str[3] === ":")) return "FARPTR16" + str.slice(4);
-	if(str.startsWith("m512")) return "M512";
-	if(str.startsWith("m80") || str.startsWith("m108")) return "X64_ALLMEMMASK"
-	if(str.startsWith("m") && str.endsWith("byte")) return "M32";
-	if(str === "mem" || str === "m") return "X64_ALLMEMMASK";
-	if(str === "reg") return "R64 | R32";
-	if(str === "r8") return ["RH", "R8"];
-	if(str === "1") return "ONE";
-	// let m = str.match(/^m(\d+)$/)?.[1];
-	// if(m !== undefined) return "M" + m;
-	if(str.startsWith("vm")) str = str.slice(1);
-	let m = str.match(/^([mr])(\d+).*/)?.slice?.(1, 3);
-	if(m !== undefined) return m[0].toUpperCase() + m[1];
-	if(str === "p66") return "PREF66";
-	if(str === "pw") return "PREFREX_W";
-	if(str === "cr0-cr7") return "CR0_7";
-	if(str === "dr0-dr7") return "DREG";
-	if(str === "st(0)") return "ST_0";
-	if(str === "st(i)") return "ST";
-	if(str === "" + (+str)) return false;
-	return str.toUpperCase();
-}
-
-function insert_ins(row, name, operands) {
-	let actualops = [];
-	for(let j = 0; j < operands.length; j++) {
-		let oper = operand_types(operands[j]);
-		if(!oper) { /*console.log("Skipping encoding instruction " + name + " with operands " + operands); */ return; }
-		if(name === "ENTER" && !oper.startsWith("IMM")) { /*console.log("Skipping ENTER with operands ", operands); */ return; }
-		if(Array.isArray(oper)) {
-			oper = oper.flat();
-			oper.slice(1).forEach(o => insert_ins(row, name, [...operands.slice(0, j), o, ...operands.slice(j + 1)]));
-			actualops.push(operands[j] = oper[0]);
-		} else actualops.push(operands[j] = oper);
-	}
-	// Skip rows that have an invalid REX.W+ prefix for RH operands
-	// if(row[0].includes("REX.W+") && operands.includes("RH")) return;
-	let insname = name + " " + actualops.join(", ");
-	if(instruction_variants[insname]) {
-		if(instruction_variants[insname][0] !== row[0])
-			insname = "1_" + insname; //= insname.slice(0, insname.indexOf(" ")) + "_1" + insname.slice(insname.indexOf(" "));
-		else console.log("Overwriting row: " + insname, instruction_variants[insname], row);
-	}
-	instruction_variants[insname] = [...row, actualops];
-}
-
-// Expand opcodes that have multiple variants
-for(let i = 0; i < rows.length; i++) {
-	let row = rows[i];
-
-	// Skip instructions that are invalid in 64-bit mode
-	row[9] = row[9].trim();
-	if(row[9] === "I"/*Invalid*/ || row[9] === "NE"/*Not Encodable*/ || row[9] === "NS"/*Not Supported*/) continue;
-
-	// Skip VEX instructions
-	// if(row[0][0] === "V") continue;
-
-	let name = row[1].split(" ")[0];
-	let operands = row[1].slice(name.length).trim() ? row[1].slice(name.length + 1).split(",").map(s => s.trim().toLowerCase()) : [];
-	
-	
-	// Skip rows with fake REX+ requirements (It was just optional for them, which we already handle)
-	if(row[0].includes("REX+") && !["LSS", "LFS", "LGS"].includes(name)) continue;
-	
-	if(operands[0]) insert_ins(row, name, operands);
-	else instruction_variants[name] = row;
-}
-// console.log(Object.fromEntries(Object.entries(instruction_variants).slice(130, 150)));
-
-let final_variants = {};
-for(let i in instruction_variants) {
-	let name = i.split(" ")[0];
-	if(name.startsWith("1_")) name = name.slice(2);
-	
-	let row = instruction_variants[i];
-
-	let opcode = row[0].split(" ");
-	let variant = "{";
-	let prefixes = "";
-	let bytes = [];
-	let prefdone = false;
-	let firstdone = false;
-	let pref66 = false;
-
-	if(opcode[0].startsWith("VEX")) {
-		const vex_op = opcode[0].slice(4).split(".");
-		const prefixes = ["66", "F3", "F2"];
-		const maps = ["0F", "0F38", "0F3A"];
-		
-		let vex_w = 0;
-		let opcode_map = 1;
-		let prefix = 0;
-		let long = 0;
-		
-		for(let op of vex_op) {
-			if(op === "256") long = 1;
-			else if(op === "W1") vex_w = 1;
-			else if(maps.includes(op)) opcode_map = maps.indexOf(op) + 1;
-			else if(prefixes.includes(op)) prefix = prefixes.indexOf(op) + 1;
-		}
-
-		if(opcode_map > 1 || vex_w || long)
-			variant += "\n\t\t.vex = 0x80 | " + opcode_map + ",";
-		else variant += "\n\t\t.vex = " + opcode_map + ",";
-		variant += " .vex_byte = 0x" + (long << 2 | vex_w << 7 | prefix | 0b01111000).toString(16) + ",";
-		opcode = opcode.slice(1);
-		prefdone = true;
-		firstdone = true;
-	}
-
-	for(let i of opcode) {
-		if(!prefdone && const_prefixes.has(i))
-			prefixes += i;
-		else if(!prefdone && (i === "PREF.66+" || i === "66"))
-			pref66 = true;
-		else if (!prefdone && i.startsWith("REX")) {
-			// if(row[15]?.includes("RH")) console.log("uhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh why did this happen");
-			if(i[3] === "+")
-				variant += (firstdone ? " " : "\n\t\t") + ".rex = 0x40,", firstdone = true;
-			else if(i[4] === "W")
-				variant += (firstdone ? " " : "\n\t\t") + ".rex = 0x48,", firstdone = true;
-			else if(i[4] === "R")
-				variant += (firstdone ? " " : "\n\t\t") + ".rex = 0x44,", firstdone = true;
-		}
-		else if(i.match(/[\dA-F][\dA-F]/))
-			bytes.push(i), prefdone = true;
-		else if (i.match(/\/[r01234567]/)) {
-			variant += (firstdone ? " " : "\n\t\t") + ".modrmreq = true,", firstdone = true;
-			if(i[1] === "r") variant += " .modrmreg = true,";
-			else variant += " .modrm = 0x" + (+i[1] << 3).toString(16) + ",";
-		}// else if ((i === "ib" || i === "iw" || i === "id" || i === "iq") && !variant.includes("immediate"))
-		// 	variant += "\n\t\t.immediate = " + (row[15].findIndex(o => o.startsWith("IMM")) + 1) + ",";
-	}
-	
-	let operands = row[15];
-	let rel_oper = 0;
-	let imm = 0;
-	if(operands?.[0]) {
-		if(name !== "ENTER" && name !== "FSTSW" && name !== "FNSTSW" && name !== "LDDQU" && name !== "LEA" && i !== "MOV SREG, R16" &&
-			name !== "PINSRW" && name !== "RET" && name !== "VERR" && i !== "MOVSX R32, R16" && i !== "MOVSX R64, R16" && i !== "MOVSX R32, M16" &&
-			i !== "MOVSX R64, M16" && i !== "MOVZX R32, R16" && i !== "MOVZX R64, R16" && i !== "MOVZX R32, M16" && i !== "MOVZX R64, M16" &&
-			(operands.includes("M16") || operands.includes("R16") || operands.includes("AX") || operands.includes("IMM16"))) // Exhaustive list of instructions that don't require a 66 prefix
-				pref66 = true;
-		variant += "\n\t\t.args = { " + operands.join(", ")+ " }, .arglen = " + operands.length + ",";
-		imm = operands.findIndex(o => o.startsWith("IMM")) + 1;
-		if(imm) variant += " .imm_oper = " + imm + ",";
-		if(row[2].includes("D")) variant += " .rel_oper = " + (rel_oper = row[2].indexOf("D") + 1) + ",";
-		if(row[2].includes("M")) variant += " .mem_oper = " + (row[2].indexOf("M") + 1) + ",";
-		if(row[2].includes("R") || row[2] === "XM"/*what the fuck intel*/) variant += " .reg_oper = " + (row[2].indexOf("R") + 1 + row[2].indexOf("X") + 1) + ",";
-		else if(row[2].includes("O")) variant += " .reg_oper = " + (row[2].indexOf("O") + 1) + ","; // THIS IS NOT RELATIVE, THIS IS GODDAMN THE +rd WHATEVER THING THAT GOES ON TOP OF THE OPCODE
-		if(row[0].includes("/is4")) variant += " .is4_oper = " + (row[2].lastIndexOf("R") + 1) + ",";
-		if(row[2].includes("V")) variant += " .vex_oper = " + (row[2].indexOf("V") + 1) + ",";
-	}
-	
-	if(desc_strings) {
-		variant += "\n\t\t.orig_ins = \"" + row[1] + "\", .orig_opcode = \"" + row[0] + "\",";
-		variant += "\n\t\t.desc = \"" + row[14].replaceAll('"', "\\\"") + "\",";
-	}
-	
-	variant += "\n\t\t";
-	if(pref66) prefixes += "66"; // Prefix 66 is usually before the other prefixes like FWAIT
-	if(prefixes) variant += ".prefixes = 0x" + prefixes + ", ";
-	variant += ".opcode = 0x" + (bytes.reverse().join("") || 0) + ", .oplen = " + (bytes.length) + ",";
-	if(row[13] === "YES") variant += "\n\t\t.preffered = true,";
-	
-	// variant += "\n\t\t.base_size = " + (((prefixes.length / 2) + (bytes.length)) +
-	// 																		(rel_oper && (operands[rel_oper - 1] == "REL32" ? 4 : 1)) +
-	// 																		(imm ? 2 ** (["IMM8", "IMM16", "IMM32", "IMM64"].indexOf(operands[imm - 1])) : 0)) + ",";
-  variant += "\n\t}";
-	
-	if(!final_variants[name])
-		final_variants[name] = [];
-	final_variants[name].push(variant);
-}
-
-console.log("Parsed Instructions: " + Object.keys(instruction_variants).length);
-// console.log(Object.values(instruction_variants).reduce((a, b) => a < b.length ? b.length : a, 0) + " variants");
-// Instruction decoder:
-// Decodes instructions like "REX+ 80 /4 ib" this and returns a value in the form of the struct
-
-let asmh = `/*
+/*
  * asm_x64.h v1.0.0 - Aqil Contractor @AqilC 2023
  * Licenced under Attribution-NonCommercial-ShareAlike 3.0
  *
@@ -236,37 +21,41 @@ enum x64OperandType: uint64_t {
 	X64_LABEL_REF = 0x20,
 
 	M8 = 0x40, M16 = 0x80, M32 = 0x100, M64 = 0x200, M128 = 0x400, M256 = 0x800, M512 = 0x1000,
-	FARPTR1616 = 0x2000, FARPTR1632 = 0x4000, FARPTR1664 = 0x8000,
+	M80 = 0x2000,
+	// M16INT = 0x2000, M32INT = 0x4000, M64INT = 0x8000, M32FP = 0x10000, M64FP = 0x20000,
+	// M80FP = 0x40000, M80BCD = 0x80000, M2BYTE = 0x100000, M28BYTE = 0x200000,
+	// M108BYTE = 0x400000, M512BYTE = 0x800000,
+	FARPTR1616 = 0x1000000, FARPTR1632 = 0x2000000, FARPTR1664 = 0x4000000,
 	
-	MM = 0x10000,
+	MM = 0x8000000,
 
-	PREF66 = 0x20000,
-	PREFREX_W = 0x40000,
-	FAR = 0x80000,
+	PREF66 = 0x10000000,
+	PREFREX_W = 0x20000000,
+	FAR = 0x40000000,
 
-	MOFFS8 = 0x100000, MOFFS16 = 0x200000, MOFFS32 = 0x400000, MOFFS64 = 0x800000,
+	MOFFS8 = 0x80000000, MOFFS16 = 0x100000000, MOFFS32 = 0x200000000, MOFFS64 = 0x400000000,
 
-	R8 = 0x1000000, RH = 0x2000000, AL = 0x4000000, CL = 0x8000000,
-	R16 = 0x10000000, AX = 0x20000000, DX = 0x40000000,
-	R32 = 0x80000000, EAX = 0x100000000,
-	R64 = 0x200000000, RAX = 0x400000000,
+	R8 = 0x800000000, RH = 0x1000000000, AL = 0x2000000000, CL = 0x4000000000,
+	R16 = 0x8000000000, AX = 0x10000000000, DX = 0x20000000000,
+	R32 = 0x40000000000, EAX = 0x80000000000,
+	R64 = 0x100000000000, RAX = 0x200000000000,
 
-	REL8 = 0x800000000,
-	REL32 = 0x1000000000,
+	REL8 = 0x400000000000,
+	REL32 = 0x800000000000,
 
-	SREG = 0x2000000000, FS = 0x4000000000, GS = 0x8000000000,
+	SREG = 0x1000000000000, FS = 0x2000000000000, GS = 0x4000000000000,
 
-	ST = 0x10000000000, ST_0 = 0x20000000000,
+	ST = 0x8000000000000, ST_0 = 0x10000000000000,
 
-	XMM = 0x40000000000, XMM_0 = 0x80000000000,
-	YMM = 0x100000000000,
-	ZMM = 0x200000000000,
+	XMM = 0x20000000000000, XMM_0 = 0x40000000000000,
+	YMM = 0x80000000000000,
+	ZMM = 0x100000000000000,
 	
-	CR0_7 = 0x400000000000, CR8 = 0x800000000000,
-	DREG = 0x1000000000000,
+	CR0_7 = 0x200000000000000, CR8 = 0x400000000000000,
+	DREG = 0x800000000000000,
 	
-	ONE = 0x2000000000000 // EXACTLY ENOUGH TO FIT IN A 64-BIT INTEGER LETS FUCKING GO
-	// 2 bytes + 2 bits for extra things that can't fit in \`value\`, like segment registers 😈
+	ONE = 0x1000000000000000 // EXACTLY ENOUGH TO FIT IN A 64-BIT INTEGER LETS FUCKING GO
+	// 2 bytes + 2 bits for extra things that can't fit in `value`, like segment registers 😈
 };
 typedef enum x64OperandType x64OperandType;
 
@@ -276,7 +65,7 @@ typedef enum x64OperandType x64OperandType;
 #define X64_ALLREGMASK (R8 | RH | R16 | R32 | R64 | MM | XMM | YMM | ZMM | SREG | CR0_7 | DREG | CR8)
 
 enum x64Op {
-	END_ASM, ${Object.keys(final_variants).map(s => s.toUpperCase().replace(" ", "_")).join(", ")}, X64_LABEL_DEF
+	END_ASM, ADC, ADD, ADDPD, VADDPD, ADDPS, VADDPS, ADDSD, VADDSD, ADDSS, VADDSS, ADDSUBPD, VADDSUBPD, ADDSUBPS, VADDSUBPS, AESDEC, VAESDEC, AESDECLAST, VAESDECLAST, AESENC, VAESENC, AESENCLAST, VAESENCLAST, AESIMC, VAESIMC, AESKEYGENASSIST, VAESKEYGENASSIST, AND, ANDN, ANDPD, VANDPD, ANDPS, VANDPS, ANDNPD, VANDNPD, ANDNPS, VANDNPS, BLENDPD, VBLENDPD, BEXTR, BLENDPS, VBLENDPS, BLENDVPD, VBLENDVPD, BLENDVPS, VBLENDVPS, BLSI, BLSMSK, BLSR, BSF, BSR, BSWAP, BT, BTC, BTR, BTS, BZHI, CALL, CBW, CWDE, CDQE, CLC, CLD, CLFLUSH, CLI, CLTS, CMC, CMOVA, CMOVAE, CMOVB, CMOVBE, CMOVC, CMOVE, CMOVG, CMOVGE, CMOVL, CMOVLE, CMOVNA, CMOVNAE, CMOVNB, CMOVNBE, CMOVNC, CMOVNE, CMOVNG, CMOVNGE, CMOVNL, CMOVNLE, CMOVNO, CMOVNP, CMOVNS, CMOVNZ, CMOVO, CMOVP, CMOVPE, CMOVPO, CMOVS, CMOVZ, CMP, CMPPD, VCMPPD, CMPPS, VCMPPS, CMPS, CMPSB, CMPSW, CMPSD, CMPSQ, VCMPSD, CMPSS, VCMPSS, CMPXCHG, CMPXCHG8B, CMPXCHG16B, COMISD, VCOMISD, COMISS, VCOMISS, CPUID, CRC32, CVTDQ2PD, VCVTDQ2PD, CVTDQ2PS, VCVTDQ2PS, CVTPD2DQ, VCVTPD2DQ, CVTPD2PI, CVTPD2PS, VCVTPD2PS, CVTPI2PD, CVTPI2PS, CVTPS2DQ, VCVTPS2DQ, CVTPS2PD, VCVTPS2PD, CVTPS2PI, CVTSD2SI, VCVTSD2SI, CVTSD2SS, VCVTSD2SS, CVTSI2SD, VCVTSI2SD, CVTSI2SS, VCVTSI2SS, CVTSS2SD, VCVTSS2SD, CVTSS2SI, VCVTSS2SI, CVTTPD2DQ, VCVTTPD2DQ, CVTTPD2PI, CVTTPS2DQ, VCVTTPS2DQ, CVTTPS2PI, CVTTSD2SI, VCVTTSD2SI, CVTTSS2SI, VCVTTSS2SI, CWD, CDQ, CQO, DEC, DIV, DIVPD, VDIVPD, DIVPS, VDIVPS, DIVSD, VDIVSD, DIVSS, VDIVSS, DPPD, VDPPD, DPPS, VDPPS, EMMS, ENTER, EXTRACTPS, VEXTRACTPS, F2XM1, FABS, FADD, FADDP, FIADD, FBLD, FBSTP, FCHS, FCLEX, FNCLEX, FCMOVB, FCMOVE, FCMOVBE, FCMOVU, FCMOVNB, FCMOVNE, FCMOVNBE, FCMOVNU, FCOM, FCOMP, FCOMPP, FCOMI, FCOMIP, FUCOMI, FUCOMIP, FCOS, FDECSTP, FDIV, FDIVP, FIDIV, FDIVR, FDIVRP, FIDIVR, FFREE, FICOM, FICOMP, FILD, FINCSTP, FINIT, FNINIT, FIST, FISTP, FISTTP, FLD, FLD1, FLDL2T, FLDL2E, FLDPI, FLDLG2, FLDLN2, FLDZ, FLDCW, FLDENV, FMUL, FMULP, FIMUL, FNOP, FPATAN, FPREM, FPREM1, FPTAN, FRNDINT, FRSTOR, FSAVE, FNSAVE, FSCALE, FSIN, FSINCOS, FSQRT, FST, FSTP, FSTCW, FNSTCW, FSTENV, FNSTENV, FSTSW, FNSTSW, FSUB, FSUBP, FISUB, FSUBR, FSUBRP, FISUBR, FTST, FUCOM, FUCOMP, FUCOMPP, FXAM, FXCH, FXRSTOR, FXRSTOR64, FXSAVE, FXSAVE64, FXTRACT, FYL2X, FYL2XP1, HADDPD, VHADDPD, HADDPS, VHADDPS, HLT, HSUBPD, VHSUBPD, HSUBPS, VHSUBPS, IDIV, IMUL, IN, INC, INS, INSB, INSW, INSD, INSERTPS, VINSERTPS, INT3, INT1, INT, INVD, INVLPG, INVPCID, IRET, IRETD, IRETQ, JA, JAE, JB, JBE, JC, JECXZ, JRCXZ, JE, JG, JGE, JL, JLE, JNA, JNAE, JNB, JNBE, JNC, JNE, JNG, JNGE, JNL, JNLE, JNO, JNP, JNS, JNZ, JO, JP, JPE, JPO, JS, JZ, JMP, LAHF, LAR, LDDQU, VLDDQU, LDMXCSR, VLDMXCSR, LSS, LFS, LGS, LEA, LEAVE, LFENCE, LGDT, LIDT, LLDT, LMSW, LOCK, LODS, LODSB, LODSW, LODSD, LODSQ, LOOP, LOOPE, LOOPNE, LSL, LTR, LZCNT, MASKMOVDQU, VMASKMOVDQU, MASKMOVQ, MAXPD, VMAXPD, MAXPS, VMAXPS, MAXSD, VMAXSD, MAXSS, VMAXSS, MFENCE, MINPD, VMINPD, MINPS, VMINPS, MINSD, VMINSD, MINSS, VMINSS, MONITOR, MOV, MOVAPD, VMOVAPD, MOVAPS, VMOVAPS, MOVBE, MOVD, MOVQ, VMOVD, VMOVQ, MOVDDUP, VMOVDDUP, MOVDQA, VMOVDQA, MOVDQU, VMOVDQU, MOVDQ2Q, MOVHLPS, VMOVHLPS, MOVHPD, VMOVHPD, MOVHPS, VMOVHPS, MOVLHPS, VMOVLHPS, MOVLPD, VMOVLPD, MOVLPS, VMOVLPS, MOVMSKPD, VMOVMSKPD, MOVMSKPS, VMOVMSKPS, MOVNTDQA, VMOVNTDQA, MOVNTDQ, VMOVNTDQ, MOVNTI, MOVNTPD, VMOVNTPD, MOVNTPS, VMOVNTPS, MOVNTQ, MOVQ2DQ, MOVS, MOVSB, MOVSW, MOVSD, MOVSQ, VMOVSD, MOVSHDUP, VMOVSHDUP, MOVSLDUP, VMOVSLDUP, MOVSS, VMOVSS, MOVSX, MOVSXD, MOVUPD, VMOVUPD, MOVUPS, VMOVUPS, MOVZX, MPSADBW, VMPSADBW, MUL, MULPD, VMULPD, MULPS, VMULPS, MULSD, VMULSD, MULSS, VMULSS, MULX, MWAIT, NEG, NOP, NOT, OR, ORPD, VORPD, ORPS, VORPS, OUT, OUTS, OUTSB, OUTSW, OUTSD, PABSB, PABSW, PABSD, VPABSB, VPABSW, VPABSD, PACKSSWB, PACKSSDW, VPACKSSWB, VPACKSSDW, PACKUSDW, VPACKUSDW, PACKUSWB, VPACKUSWB, PADDB, PADDW, PADDD, VPADDB, VPADDW, VPADDD, PADDQ, VPADDQ, PADDSB, PADDSW, VPADDSB, VPADDSW, PADDUSB, PADDUSW, VPADDUSB, VPADDUSW, PALIGNR, VPALIGNR, PAND, VPAND, PANDN, VPANDN, PAUSE, PAVGB, PAVGW, VPAVGB, VPAVGW, PBLENDVB, VPBLENDVB, PBLENDW, VPBLENDW, PCLMULQDQ, VPCLMULQDQ, PCMPEQB, PCMPEQW, PCMPEQD, VPCMPEQB, VPCMPEQW, VPCMPEQD, PCMPEQQ, VPCMPEQQ, PCMPESTRI, VPCMPESTRI, PCMPESTRM, VPCMPESTRM, PCMPGTB, PCMPGTW, PCMPGTD, VPCMPGTB, VPCMPGTW, VPCMPGTD, PCMPGTQ, VPCMPGTQ, PCMPISTRI, VPCMPISTRI, PCMPISTRM, VPCMPISTRM, PDEP, PEXT, PEXTRB, PEXTRD, PEXTRQ, VPEXTRB, VPEXTRD, VPEXTRQ, PEXTRW, VPEXTRW, PHADDW, PHADDD, VPHADDW, VPHADDD, PHADDSW, VPHADDSW, PHMINPOSUW, VPHMINPOSUW, PHSUBW, PHSUBD, VPHSUBW, VPHSUBD, PHSUBSW, VPHSUBSW, PINSRB, PINSRD, VPINSRB, VPINSRD, VPINSRQ, PINSRW, VPINSRW, PMADDUBSW, VPMADDUBSW, PMADDWD, VPMADDWD, PMAXSB, VPMAXSB, PMAXSD, VPMAXSD, PMAXSW, VPMAXSW, PMAXUB, VPMAXUB, PMAXUD, VPMAXUD, PMAXUW, VPMAXUW, PMINSB, VPMINSB, PMINSD, VPMINSD, PMINSW, VPMINSW, PMINUB, VPMINUB, PMINUD, VPMINUD, PMINUW, VPMINUW, PMOVMSKB, VPMOVMSKB, PMOVSXBW, PMOVSXBD, PMOVSXBQ, PMOVSXWD, PMOVSXWQ, PMOVSXDQ, VPMOVSXBW, VPMOVSXBD, VPMOVSXBQ, VPMOVSXWD, VPMOVSXWQ, VPMOVSXDQ, PMOVZXBW, PMOVZXBD, PMOVZXBQ, PMOVZXWD, PMOVZXWQ, PMOVZXDQ, VPMOVZXBW, VPMOVZXBD, VPMOVZXBQ, VPMOVZXWD, VPMOVZXWQ, VPMOVZXDQ, PMULDQ, VPMULDQ, PMULHRSW, VPMULHRSW, PMULHUW, VPMULHUW, PMULHW, VPMULHW, PMULLD, VPMULLD, PMULLW, VPMULLW, PMULUDQ, VPMULUDQ, POP, POPCNT, POPF, POPFQ, POR, VPOR, PREFETCHT0, PREFETCHT1, PREFETCHT2, PREFETCHNTA, PSADBW, VPSADBW, PSHUFB, VPSHUFB, PSHUFD, VPSHUFD, PSHUFHW, VPSHUFHW, PSHUFLW, VPSHUFLW, PSHUFW, PSIGNB, PSIGNW, PSIGND, VPSIGNB, VPSIGNW, VPSIGND, PSLLDQ, VPSLLDQ, PSLLW, PSLLD, PSLLQ, VPSLLW, VPSLLD, VPSLLQ, PSRAW, PSRAD, VPSRAW, VPSRAD, PSRLDQ, VPSRLDQ, PSRLW, PSRLD, PSRLQ, VPSRLW, VPSRLD, VPSRLQ, PSUBB, PSUBW, PSUBD, VPSUBB, VPSUBW, VPSUBD, PSUBQ, VPSUBQ, PSUBSB, PSUBSW, VPSUBSB, VPSUBSW, PSUBUSB, PSUBUSW, VPSUBUSB, VPSUBUSW, PTEST, VPTEST, PUNPCKHBW, PUNPCKHWD, PUNPCKHDQ, PUNPCKHQDQ, VPUNPCKHBW, VPUNPCKHWD, VPUNPCKHDQ, VPUNPCKHQDQ, PUNPCKLBW, PUNPCKLWD, PUNPCKLDQ, PUNPCKLQDQ, VPUNPCKLBW, VPUNPCKLWD, VPUNPCKLDQ, VPUNPCKLQDQ, PUSH, PUSHQ, PUSHW, PUSHF, PUSHFQ, PXOR, VPXOR, RCL, RCR, ROL, ROR, RCPPS, VRCPPS, RCPSS, VRCPSS, RDFSBASE, RDGSBASE, RDMSR, RDPMC, RDRAND, RDTSC, RDTSCP, REP_INS, REP_MOVS, REP_OUTS, REP_LODS, REP_STOS, REPE_CMPS, REPE_SCAS, REPNE_CMPS, REPNE_SCAS, RET, RORX, ROUNDPD, VROUNDPD, ROUNDPS, VROUNDPS, ROUNDSD, VROUNDSD, ROUNDSS, VROUNDSS, RSQRTPS, VRSQRTPS, RSQRTSS, VRSQRTSS, SAHF, SAL, SAR, SHL, SHR, SARX, SHLX, SHRX, SBB, SCAS, SCASB, SCASW, SCASD, SCASQ, SETA, SETAE, SETB, SETBE, SETC, SETE, SETG, SETGE, SETL, SETLE, SETNA, SETNAE, SETNB, SETNBE, SETNC, SETNE, SETNG, SETNGE, SETNL, SETNLE, SETNO, SETNP, SETNS, SETNZ, SETO, SETP, SETPE, SETPO, SETS, SETZ, SFENCE, SGDT, SHLD, SHRD, SHUFPD, VSHUFPD, SHUFPS, VSHUFPS, SIDT, SLDT, SMSW, SQRTPD, VSQRTPD, SQRTPS, VSQRTPS, SQRTSD, VSQRTSD, SQRTSS, VSQRTSS, STC, STD, STI, STMXCSR, VSTMXCSR, STOS, STOSB, STOSW, STOSD, STOSQ, STR, SUB, SUBPD, VSUBPD, SUBPS, VSUBPS, SUBSD, VSUBSD, SUBSS, VSUBSS, SWAPGS, SYSCALL, SYSENTER, SYSEXIT, SYSRET, TEST, TZCNT, UCOMISD, VUCOMISD, UCOMISS, VUCOMISS, UD2, UNPCKHPD, VUNPCKHPD, UNPCKHPS, VUNPCKHPS, UNPCKLPD, VUNPCKLPD, UNPCKLPS, VUNPCKLPS, VBROADCASTSS, VBROADCASTSD, VBROADCASTF128, VCVTPH2PS, VCVTPS2PH, VERR, VERW, VEXTRACTF128, VEXTRACTI128, VFMADD132PD, VFMADD213PD, VFMADD231PD, VFMADD132PS, VFMADD213PS, VFMADD231PS, VFMADD132SD, VFMADD213SD, VFMADD231SD, VFMADD132SS, VFMADD213SS, VFMADD231SS, VFMADDSUB132PD, VFMADDSUB213PD, VFMADDSUB231PD, VFMADDSUB132PS, VFMADDSUB213PS, VFMADDSUB231PS, VFMSUBADD132PD, VFMSUBADD213PD, VFMSUBADD231PD, VFMSUBADD132PS, VFMSUBADD213PS, VFMSUBADD231PS, VFMSUB132PD, VFMSUB213PD, VFMSUB231PD, VFMSUB132PS, VFMSUB213PS, VFMSUB231PS, VFMSUB132SD, VFMSUB213SD, VFMSUB231SD, VFMSUB132SS, VFMSUB213SS, VFMSUB231SS, VFNMADD132PD, VFNMADD213PD, VFNMADD231PD, VFNMADD132PS, VFNMADD213PS, VFNMADD231PS, VFNMADD132SD, VFNMADD213SD, VFNMADD231SD, VFNMADD132SS, VFNMADD213SS, VFNMADD231SS, VFNMSUB132PD, VFNMSUB213PD, VFNMSUB231PD, VFNMSUB132PS, VFNMSUB213PS, VFNMSUB231PS, VFNMSUB132SD, VFNMSUB213SD, VFNMSUB231SD, VFNMSUB132SS, VFNMSUB213SS, VFNMSUB231SS, VGATHERDPD, VGATHERQPD, VGATHERDPS, VGATHERQPS, VPGATHERDD, VPGATHERQD, VPGATHERDQ, VPGATHERQQ, VINSERTF128, VINSERTI128, VMASKMOVPS, VMASKMOVPD, VPBLENDD, VPBROADCASTB, VPBROADCASTW, VPBROADCASTD, VPBROADCASTQ, VBROADCASTI128, VPERMD, VPERMPD, VPERMPS, VPERMQ, VPERM2I128, VPERMILPD, VPERMILPS, VPERM2F128, VPMASKMOVD, VPMASKMOVQ, VPSLLVD, VPSLLVQ, VPSRAVD, VPSRLVD, VPSRLVQ, VTESTPS, VTESTPD, VZEROALL, VZEROUPPER, WAIT, FWAIT, WBINVD, WRFSBASE, WRGSBASE, WRMSR, XACQUIRE, XRELEASE, XABORT, XADD, XBEGIN, XCHG, XEND, XGETBV, XLAT, XLATB, XOR, XORPD, VXORPD, XORPS, VXORPS, XRSTOR, XRSTOR64, XSAVE, XSAVE64, XSAVEOPT, XSAVEOPT64, XSETBV, XTEST, X64_LABEL_DEF
 };
 typedef enum x64Op x64Op;
 
@@ -302,10 +91,7 @@ typedef x64Ins x64[];
 struct x64LookupGeneralIns {
 	char* name;
 	unsigned int numactualins;
-	struct x64LookupActualIns {${desc_strings ? `
-		char* orig_ins;
-		char* orig_opcode;
-		char* desc;` : ""}
+	struct x64LookupActualIns {
 		uint8_t mem_oper; // Index of memory operand if there is one + 1
 		uint8_t reg_oper; // Index of register operand if there is one + 1
 		uint8_t rel_oper; // Index of relative jump operand if there is one + 1
@@ -329,10 +115,6 @@ struct x64LookupGeneralIns {
 };
 typedef struct x64LookupActualIns x64LookupActualIns;
 typedef struct x64LookupGeneralIns x64LookupGeneralIns;
-
-static const x64LookupGeneralIns x64Table[] = {
-${Object.entries(final_variants).map(([name, variants]) => `\t{ "${name.toLowerCase().replace("_", " ")}", ${variants.length}, (struct x64LookupActualIns[]) { ${variants.join(", ")} } }`).join(",\n")}
-};
 
 #define imm(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM8 | IMM16 | IMM32 | IMM64, (value) }
 #define im64(value) (x64Operand) { ((value) == 1 ? ONE : 0) | IMM64, (value) }
@@ -596,27 +378,27 @@ enum x64RegisterReference {
 //hi = (disp, base) => (disp & 0xffffffffn | ((base) & 0x30n ? ( (BigInt((base) == 0x20n) && (1n << 61n)) | (BigInt((base) == 0xfff0n) && (0x1n << 36n)) | BigInt((base & 0xfn) << 32n) ) : (0x1n << 60n) | ((base) & 0xfn) << 32n))
 
 
-#define X64MEM_1_ARGS(base)                      (((base) & 0x30 ?\\
-																										( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\\
-																										((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32) |\\
+#define X64MEM_1_ARGS(base)                      (((base) & 0x30 ?\
+																										( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\
+																										((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32) |\
 																									(uint64_t) 0x10 << 40)
 #define X64MEM_2_ARGS(base, disp)               (disp & 0xffffffff | X64MEM_1_ARGS(base))
-#define X64MEM_3_ARGS(base, disp, index)        (disp & 0xffffffff | ((base) & 0x30 ?\\
-																										( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\\
-																										((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32) |\\
+#define X64MEM_3_ARGS(base, disp, index)        (disp & 0xffffffff | ((base) & 0x30 ?\
+																										( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\
+																										((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32) |\
 																									(uint64_t) ((index) == $none ? 0x10 : (index) & 0xf) << 40)
 #define X64MEM_4_ARGS(base, disp, index, scale) (X64MEM_3_ARGS(base, disp, index) | (uint64_t) ((scale) <= 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48)
-#define X64MEM_5_ARGS(base, disp, index, scale, segment) (disp & 0xffffffff\\
-	| ((base) & 0x30 ? /*If the operand is more than 32 bits wide or is equal to the RIP register, set mode to wide addressing and set base register, or RIP addressing*/\\
-			( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\\
-			((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32)\\
-	| (uint64_t) ((index) == $none ? 0x10 : (index) & 0xf) << 40\\
-	| (uint64_t) ((scale) <= 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48\\
+#define X64MEM_5_ARGS(base, disp, index, scale, segment) (disp & 0xffffffff\
+	| ((base) & 0x30 ? /*If the operand is more than 32 bits wide or is equal to the RIP register, set mode to wide addressing and set base register, or RIP addressing*/\
+			( ((uint64_t) ((base) == $rip) ? ((uint64_t) 0x1 << 61) : 0) | ((uint64_t) ((base) == $riprel) ? ((uint64_t) 0x3 << 61) : 0) | ((uint64_t) ((base) == $none) ? ((uint64_t) 0x1 << 36) : 0) | ((uint64_t) ((base) & 0xf) << 32) ) :\
+			((uint64_t) 0x1 << 60) | (uint64_t) ((base) & 0xf) << 32)\
+	| (uint64_t) ((index) == $none ? 0x10 : (index) & 0xf) << 40\
+	| (uint64_t) ((scale) <= 1 ? 0b00 : (scale) == 2 ? 0b01 : (scale) == 4 ? 0b10 : 0b11) << 48\
 	| (uint64_t) (((segment) - $rip) & (uint64_t) 0x7) << 56) /* minusing from $rip, because segment registers are 1 + their value for simplification. */
 
 #define GET_4TH_ARG(arg1, arg2, arg3, arg4, arg5, arg6, ...) arg6
-#define X64MEM_MACRO_CHOOSER(...) \\
-    GET_4TH_ARG(__VA_ARGS__, X64MEM_5_ARGS, X64MEM_4_ARGS, X64MEM_3_ARGS, \\
+#define X64MEM_MACRO_CHOOSER(...) \
+    GET_4TH_ARG(__VA_ARGS__, X64MEM_5_ARGS, X64MEM_4_ARGS, X64MEM_3_ARGS, \
                 X64MEM_2_ARGS, X64MEM_1_ARGS, )
 
 #define x64mem(...) X64MEM_MACRO_CHOOSER(__VA_ARGS__)(__VA_ARGS__)
@@ -645,6 +427,3 @@ void (*x64_exec(void* mem, uint32_t size))();
 
 // Gets last emitted error code and string.
 char* get_error(int* errcode);
-`;
-
-write(`asm_x64.h`, asmh);
