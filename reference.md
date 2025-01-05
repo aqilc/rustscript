@@ -24,17 +24,11 @@ let c: *bool = &b;
 if hi < 10 {
 	return
 }
-if hi < 10 return // equivalent
-
-for i in array {}
-for i of array {}
-for i in obj {}
+if hi < 10 return // Special syntax for certain keywords
 
 for i to 10 {}
-for i from 0 to 10 {}
 for i = 0; i < 10; i ++ {} // equivalent to above
 
-while cond =>;
 while cond {}
 ```
 
@@ -123,24 +117,7 @@ struct rgb is Ordered, Packed { r: u8, g, b; }
 
 let point = Point { y: &point, [3]: "hello!" }
 let color = rgb { 10, 20, 30 }
-point.method5()..method7
+point.method5().method7
 ```
 
 > Note: , or ; are allowed to separate members, but you can put them on new lines without either.
-
-## Objects
-
-Behave mostly like JavaScript Objects
-
-```typescript
-let hi = {
-	"full": "json" + " supported",
-	[1 + 2]: "number keys supported",
-}
-
-type someobj = {
-	hi: number
-}
-type someobj2 = object
-type someobj3 = object<number, string>
-```

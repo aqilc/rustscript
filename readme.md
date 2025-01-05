@@ -1,6 +1,6 @@
-# rustscript
+# rush
 
-An ambitious project, with the goal of making a lightweight scripting language that tries to combine the main concepts from the languages Typescript and Rust. Should be usable without types with powerful inference to an extent.
+
 
 ### Goals
 
