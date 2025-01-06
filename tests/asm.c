@@ -16,7 +16,7 @@ x64Ins curins;
 	SUB(#__VA_ARGS__ " => " #bytes) {\
 		instructionlen = x64emit(&curins, buf);\
 		expectedinslen = sizeof(#bytes) / 5;\
-		if(instructionlen == 0) puts(get_error(NULL));\
+		if(instructionlen == 0) puts(x64error(NULL));\
 		expecteq(instructionlen, expectedinslen);
 #define INSTESTMEMEQ(...) expectbyteseq(buf, { __VA_ARGS__ }); } SUBBENCH() { x64emit(&curins, buf); }
 
@@ -116,6 +116,9 @@ TEST("Assemble Special Instructions (1-2 arguments with different, FPU operand t
 	INSTEST(0x9B, FWAIT);
 	INSTESTMEMEQ(0x9B);
 
+	INSTEST(0xC8 0x0A 0x00 0x01, ENTER, imm(10), imm(1));
+	INSTESTMEMEQ(0xC8, 0x0A, 0x00, 0x01);
+
 	INSTEST(0x67 0x0F 0x01 0x02, SGDT, mem($edx));
 	INSTESTMEMEQ(0x67, 0x0F, 0x01, 0x02);
 
@@ -177,6 +180,9 @@ TEST("Stringify instructions") {
 
 	SUB("Stringify JMP, rel(1000) => jmp $+1000")
 		assertstreq(x64stringify((x64) { JMP, rel(1000) }, 1), "jmp $+1000");
+
+	SUB("Stringify VGATHERQPD, ymm3, mem($rax, 10, $ymm5, 8), ymm2 => vgatherqpd ymm3, [rax + 0xA + ymm5 * 8], ymm2")
+		assertstreq(x64stringify((x64) { VGATHERQPD, ymm3, mem($rax, 10, $ymm5, 8), ymm2 }, 1), "vgatherqpd ymm3, [rax + 0xA + ymm5 * 8], ymm2");
 }
 
 #include "tests_end.h"

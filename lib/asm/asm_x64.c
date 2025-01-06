@@ -1,6 +1,6 @@
 /*
- * asm_x64.c v1.0.0 - Aqil Contractor @AqilC 2023
- * Licenced under Attribution-NonCommercial-ShareAlike 3.0
+ * asm_x64.c v1.1.0 - Aqil Contractor @aqilc 2025
+ * Dual Licenced under MIT and Public Domain.
  *
  * This file includes all of the source for the "chasm" library macros and functions.
  */
@@ -26,7 +26,6 @@ typedef uint64_t u64;
 // INSERT TABLE HERE
 
 /**
- * TODO: Add support for VEX and EVEX instructions.
  * TODO: Error messages for using a 32 bit register to address on a mem64 operand.
  * TODO: 32 Bit support?
  */
@@ -95,7 +94,7 @@ static inline u32 error(enum AssemblyErrorType type, char* fmt, ...) {
   return 0;
 }
 
-char* get_error(int* errcode) {
+char* x64error(int* errcode) {
   if(cur_error.error) {
     cur_error.error = false;
     if(errcode) *errcode = cur_error.error_type;
@@ -135,7 +134,8 @@ static inline x64LookupActualIns* identify(const x64Ins* ins) {
   }
   // Adds more specificity to the ambiguous rel() macro's REL32 | REL8
   else if(ins->op >= JA && ins->op <= JMP && insoperands[0] & REL8) {
-    if((i32) ins->params[0].value > 127 || (i32) ins->params[0].value < -128) insoperands[0] = REL32;
+    // 8 * 15 = 120, which is the maximum value for a REL8. This is suboptimal but fast enough and simple for now.
+    if((i32) ins->params[0].value > 8 || (i32) ins->params[0].value < -8) insoperands[0] = REL32;
     else insoperands[0] = REL8;
   }
 next:
@@ -198,7 +198,7 @@ static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
 
   // Enter is the weirdest instruction ever :'(
   if(ins->op == ENTER) {
-    *(u32*) opcode_dest = 0xC8 << (8 * 3) | (u32) (ins->params[0].value & 0xFF) << (8 * 2) | (u16) ins->params[1].value;
+    *(u32*) opcode_dest = (u32) 0xC8 | (u32) ((u16) ins->params[0].value) << 8 | (u32) ((u8) ins->params[1].value) << 24;
     return 4;
   }
 
@@ -389,21 +389,21 @@ u32 x64emit(const x64Ins* ins, u8* opcode_dest) {
 
 
 static const char* reg_stringify(const x64Operand* reg) {
-  if(reg->type & R8) return ((const char*[]){ "al", "cl", "dl", "bl", "sil", "dil", "bpl", "spl", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" })[reg->value];
-  if(reg->type & RH) return ((const char*[]){ "ah", "ch", "dh", "bh" })[reg->value];
-  if(reg->type & R16) return ((const char*[]){ "ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "bp", "sp", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" })[reg->value];
-  if(reg->type & R32) return ((const char*[]){ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" })[reg->value];
-  if(reg->type & R64) return ((const char*[]){ "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" })[reg->value];
-  if(reg->type & XMM) return ((const char*[]){ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15", "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22", "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29", "xmm30", "xmm31" })[reg->value];
-  if(reg->type & YMM) return ((const char*[]){ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15", "ymm16", "ymm17", "ymm18", "ymm19", "ymm20", "ymm21", "ymm22", "ymm23", "ymm24", "ymm25", "ymm26", "ymm27", "ymm28", "ymm29", "ymm30", "ymm31" })[reg->value];
-  if(reg->type & ZMM) return ((const char*[]){ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31" })[reg->value];
-  if(reg->type & MM) return ((const char*[]){ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" })[reg->value];
-  if(reg->type & SREG) return ((const char*[]){ "es", "cs", "ss", "ds", "fs", "gs" })[reg->value];
-  if(reg->type & CR0_7) return ((const char*[]){ "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7" })[reg->value];
+  if(reg->type & R8) return ((const char*[]){ "al", "cl", "dl", "bl", "sil", "dil", "bpl", "spl", "r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" })[reg->value & 0xF];
+  if(reg->type & RH) return ((const char*[]){ "ah", "ch", "dh", "bh" })[reg->value & 0x3];
+  if(reg->type & R16) return ((const char*[]){ "ax", "cx", "dx", "bx", "sp", "bp", "si", "di", "bp", "sp", "r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" })[reg->value & 0xF];
+  if(reg->type & R32) return ((const char*[]){ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" })[reg->value & 0xF];
+  if(reg->type & R64) return ((const char*[]){ "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi", "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" })[reg->value & 0xF];
+  if(reg->type & XMM) return ((const char*[]){ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15", "xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22", "xmm23", "xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29", "xmm30", "xmm31" })[reg->value & 0xF];
+  if(reg->type & YMM) return ((const char*[]){ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7", "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15", "ymm16", "ymm17", "ymm18", "ymm19", "ymm20", "ymm21", "ymm22", "ymm23", "ymm24", "ymm25", "ymm26", "ymm27", "ymm28", "ymm29", "ymm30", "ymm31" })[reg->value & 0xF];
+  if(reg->type & ZMM) return ((const char*[]){ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7", "zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15", "zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23", "zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31" })[reg->value & 0xF];
+  if(reg->type & MM) return ((const char*[]){ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" })[reg->value & 0x7];
+  if(reg->type & SREG) return ((const char*[]){ "es", "cs", "ss", "ds", "fs", "gs" })[reg->value & 0x7];
+  if(reg->type & CR0_7) return ((const char*[]){ "cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7" })[reg->value & 0x7];
   if(reg->type & CR8) return "cr8";
-  if(reg->type & DREG) return ((const char*[]){ "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7" })[reg->value];
+  if(reg->type & DREG) return ((const char*[]){ "dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7" })[reg->value & 0x7];
   if(reg->type & ST_0) return "st";
-  else if(reg->type & ST) return ((const char*[]){ "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)" })[reg->value];
+  else if(reg->type & ST) return ((const char*[]){ "st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)" })[reg->value & 0x7];
   return NULL;
 }
 
@@ -518,8 +518,13 @@ char* x64stringify(const x64 p, u32 num) {
 
           if(disp) cursize += sprintf(code + cursize, " + 0x%X", disp);
 
-          if(!(index & 0x10))
-            cursize += sprintf(code + cursize, " + %s", reg_ref_stringify(index + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax)));
+          if(!(index & 0x10)) {
+            const char* str;
+            if(p[curins].params[i].value & 0x8000000000000000)
+              str = reg_stringify(&(x64Operand) { p[curins].params[0].type, index });
+            else str = reg_ref_stringify(index + (p[curins].params[i].value & 0x1000000000000000 ? 0 : $rax));
+            cursize += sprintf(code + cursize, " + %s", str);
+          }
 
           if(scale) cursize += sprintf(code + cursize, " * %d", 1 << scale);
         }
@@ -590,31 +595,19 @@ struct x64AssemblyRes {
   }* reloc;
 };
 
-So I just want to release this tech, I will hold off on label based linking and string storage.
-*/
-
-/**
-*things to note in readme*
-
-jmp rel8 vs jmp rel32
-no labels for now
-use x64emit to emit single instructions
-highlight $riprel and rel()
-geterror()
-highlight that the mem() macro's scale only takes 1, 2, 4 or 8
-add disclaimer/issue that vsib for instructions like vgatherqpd cannot be stringified with the current method
+So I just want to release this tbh, I will hold off on label based linking and string storage.
 */
 
 u8* x64as(const x64 p, u32 num, u32* len) {
   u32 code_size = num * 15;// 15 is the maximum size of 1 instruction. Example: lwpval rax, cs:[rax+rbx*8+0x23829382], 100000000
   u32 indexes_size = num * sizeof(u16);
-  u32 relref_size = (num / 2) * sizeof(struct x64_relative); // THIS SHOULD BE ENOUGH IN MOST CASES
+  u32 relref_size = num * sizeof(struct x64_relative);
 
   u8 *const encoding_arena = calloc(code_size + indexes_size + relref_size, 1);
   u8 *const code = encoding_arena;
   u16 *const indexes = (u16*) (encoding_arena + code_size);
   struct x64_relative *const relrefidxes = (struct x64_relative*) (encoding_arena + code_size + indexes_size);
-  // 2048 * 15 + 200 * 8 + 2048 * 4 + 2048 * 8 + 1024 * 16 = 73280, about 35x more memory than instructions :skull:
+  // 2048 * 15 + 2048 * 2 + 2048 * 16 = 67584, about 33x more memory than instructions :skull:
 
   *len = 0;
   u32 codelen = 0;
@@ -623,7 +616,6 @@ u8* x64as(const x64 p, u32 num, u32* len) {
   
   while (num --) {
     x64LookupActualIns* res = identify(p + index);
-    if(!res) goto error;
     int curlen = encode(p + index, res, code + codelen);
     if(!curlen) goto error;
 
@@ -631,34 +623,6 @@ u8* x64as(const x64 p, u32 num, u32* len) {
       i32 insns = p[index].params[res->rel_oper - 1].value;
 
       // we don't need relrefs if the value was negative
-      if(insns <= 1) {
-        if(insns + index < 0) {
-          // error(ASMERR_REL_OUT_OF_RANGE, "Relative reference out of range on ins '%s'", x64stringify(p + index, 1));
-          goto error;
-        }
-
-        i32 offset;
-
-        if(insns == 1) offset = 0;
-        else if (insns == 0) offset = -curlen;
-        else offset = indexes[index + insns] - curlen;
-
-        // printf("\nAssembling %s with an emission length of %d at index %d, referencing instruction %d away(%s), with offset %d\n", x64stringify(p + index, 1), curlen, index, insns, x64stringify(p + index + insns, 1), offset);
-        if(res->args[res->rel_oper - 1] == REL32) *(int*) (code + codelen - 4) = offset;
-        else code[codelen - 1] = (i8) offset;
-      } else {
-        relrefidxes[relreflen].ins = index;
-        relrefidxes[relreflen].res = res;
-        relrefidxes[relreflen].param = res->rel_oper - 1;
-        relreflen ++;
-      }
-    }
-
-    // Identify relrefs
-    else if(res->mem_oper && p[index].params[res->mem_oper - 1].value & 0x4000000000000000) {
-      i32 insns = p[index].params[res->mem_oper - 1].value;
-
-      // If resolving offsets for instructions that were already resolved, including the current instruction, take this fast path before adding work to the other for loop
       if(insns <= 1) {
         if(insns + index < 0) {
           error(ASMERR_REL_OUT_OF_RANGE, "Relative reference out of range on ins '%s'", x64stringify(p + index, 1));
@@ -669,16 +633,58 @@ u8* x64as(const x64 p, u32 num, u32* len) {
 
         if(insns == 1) offset = 0;
         else if (insns == 0) offset = -curlen;
-        else offset = indexes[index + insns] - codelen - curlen;
+        else offset = indexes[index + insns] - curlen;
+
+        // JCC size is either 2, 3, 5 or 6 with 0f prefixes
+        if(curlen > 4) { // DOWNSIZE IF INSTRUCTION IS TOO BIG
+          if(offset >= -125) {
+            curlen -= 3;
+            if(offset != 0) offset -= 3;
+            goto downsize;
+          }
+upsize:
+          *(int*) (code + codelen + curlen - 4) = offset;
+        }
+        else if (curlen < 4) {
+          if(offset <= -128) { // UPSIZE IF INSTRUCTION IS TOO SMALL
+            curlen += 3;
+            if(offset != 0) offset += 3;
+            goto upsize;
+          }
+downsize:
+          code[codelen + curlen - 1] = (i8) offset;
+        }
+      } else {
+        relrefidxes[relreflen].ins = index;
+        relrefidxes[relreflen].res = res;
+        relrefidxes[relreflen].param = res->rel_oper - 1;
+        relrefidxes[relreflen].size = res->args[res->rel_oper - 1] == REL32 ? 4 : 1;
+        relreflen ++;
+      }
+    }
+
+    // Identify riprels
+    else if(res->mem_oper && p[index].params[res->mem_oper - 1].value & 0x4000000000000000) {
+      i32 insns = p[index].params[res->mem_oper - 1].value;
+
+      // If resolving offsets for instructions that were already resolved, including the current instruction, take this fast path before adding work to the other for loop
+      if(insns <= 1) {
+        if(insns + index < 0) {
+          error(ASMERR_REL_OUT_OF_RANGE, "RIP Relative out of range on ins '%s'", x64stringify(p + index, 1));
+          goto error;
+        }
+
+        i32 offset;
+
+        if(insns == 1) offset = 0;
+        else if (insns == 0) offset = -curlen;
+        else offset = indexes[index + insns] - codelen - curlen; // i don't like repeating code but this is just simpler.
         
-        // printf("\nAssembling %s with an emission length of %d at index %d, referencing instruction %d away(%s), with offset %d\n", x64stringify(p + index, 1), curlen, index, insns, x64stringify(p + index + insns, 1), offset);
-
         // Currently no better way other than to directly reencode.
-
         x64Ins ins = p[index];
         ins.params[res->mem_oper - 1].value &= ~((u64) 0xffffffff);
         ins.params[res->mem_oper - 1].value |= ((u64) offset) & 0xffffffff;
-        encode(&ins, res, code + codelen);
+        encode(&ins, res, code + codelen); // THIS WILL ALWAYS BE THE SAME SIZE SO NO NEED TO MANIPULATE CURLEN, RIP SIB HAS A CONSTANT SIZE.
       } else {
         relrefidxes[relreflen].ins = index;
         relrefidxes[relreflen].res = res;
@@ -702,13 +708,11 @@ u8* x64as(const x64 p, u32 num, u32* len) {
     i32 offset = indexes[relidx + /* The current instruction that is being resolved */ *(i32*) insoffset /* The offset of the relative */]
                  - indexes[relidx + 1]; /* Added 1 because the offset is added to a rip pointing to the next instruction */
     
-        // printf("\nAssembling %s at index %d, referencing instruction %d away(%s), with offset %d\n", x64stringify(p + relidx, 1), relidx, *(i32*)insoffset, x64stringify(p + relidx + *insoffset, 1), offset);
     if(relrefidxes[i].relref) {
       // Currently no better way other than to directly reencode.
       x64Ins ins = p[relidx];
       ins.params[relrefidxes[i].param].value &= ~((u64) 0xffffffff);
       ins.params[relrefidxes[i].param].value |= ((u64) offset) & 0xffffffff;
-      // printf("Assembling %s at index %d, referencing instruction %d away, with offset %d\n", x64stringify(p + relidx, 1), relidx, (i32) p[relidx].params[relrefidxes[i].param].value, offset);
       encode(&ins, relrefidxes[i].res, code + indexes[relidx]);
     } else {
       if(relrefidxes[i].size == 4) {
@@ -725,9 +729,6 @@ error:
   return NULL;
 }
 
-// Aligns to the next multiple of a, where a is a power of 2
-static inline u32 align(u32 n, u32 a) { return (n + a - 1) & ~(a - 1); }
-
 #if defined _WIN32 | defined __CYGWIN__
 
 // https://learn.microsoft.com/en-us/windows/win32/memory/memory-protection-constants
@@ -735,11 +736,16 @@ static inline u32 align(u32 n, u32 a) { return (n + a - 1) & ~(a - 1); }
 #define PAGE_READWRITE 0x4
 // https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc
 #define MEM_COMMIT 0x00001000
+// https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree
+#define MEM_RELEASE 0x8000
 
 __attribute((dllimport)) void* __attribute((stdcall)) VirtualAlloc(void* lpAddress, size_t dwSize, u32 flAllocationType, u32 flProtect);
 __attribute((dllimport)) int __attribute((stdcall)) VirtualProtect(void* lpAddress, size_t dwSize, u32 flNewProtect, u32* lpflOldProtect);
+__attribute((dllimport)) int __attribute((stdcall)) VirtualFree(void* lpAddress, size_t dwSize, u32 dwFreeType);
 
-void (*x64_exec(void* mem, u32 size))() {
+// Aligns to the next multiple of a, where a is a power of 2
+static inline u32 align(u32 n, u32 a) { return (n + a - 1) & ~(a - 1); }
+void (*x64exec(void* mem, u32 size))() {
 	u32 pagesize = 4096;
 	u32 alignedsize = align(size, pagesize);
 
@@ -751,23 +757,24 @@ void (*x64_exec(void* mem, u32 size))() {
 	return buf;
 }
 
+void x64exec_free(void* buf, u32 size) {
+  VirtualFree(buf, 0, MEM_RELEASE);
+}
+
 #else
 #include <sys/mman.h>
 #include <unistd.h>
 
-void (*x64_exec(void* mem, u32 size))() {
-	u32 pagesize = sysconf(_SC_PAGESIZE);
-	u32 alignedsize = align(size, pagesize);
-
-	// printf("Page size: %d\n", pagesize);
-	// printf("Original size: %d, new size: %d\n", size, alignedsize);
-
-	void* buf = mmap(NULL, alignedsize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
+void (*x64exec(void* mem, u32 size))() {\
+	void* buf = mmap(NULL, size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, -1, 0);
 	memcpy(buf, mem, size);
 
 	mprotect(buf, size, PROT_READ | PROT_EXEC);
-
 	return buf;
+}
+
+void x64exec_free(void* buf, u32 size) {
+  munmap(buf, size);
 }
 
 #endif

@@ -51,22 +51,20 @@ x64Ins* bf_compile(char* in) {
 		{ PUSH, arg1 } // RCX = argument 1. 
 	});
 
-	bool raxoverwritten = false;
+	bool rax_garbled = false;
 
 	while(*in) {
 		switch(*in) {
 		case '>':
 		case '<':
 			vpush(ret, { *in == '>' ? INC : DEC, m64($rbp, -8) });
-			
-			if(!raxoverwritten)
-				vpush(ret, { *in == '>' ? INC : DEC, rax });
+			rax_garbled = true;
 			break;
 		case '+':
 		case '-': {
-			if(raxoverwritten) {
+			if(rax_garbled) {
 				vpush(ret, { MOV, rax, m64($rbp, -8) });
-				raxoverwritten = false;
+				rax_garbled = false;
 			}
 
 			vpush(ret, { *in == '+' ? INC : DEC, m8($rax) });
@@ -77,10 +75,10 @@ x64Ins* bf_compile(char* in) {
 				{ LEA, rsi, m64($riprel, 0) }, // 0 here means $+0 or the current instruction
 				{ PUSH, rsi }
 			});
-			raxoverwritten = true; // Because ] overwrites rax, so it's probably overwritten and if it's not, nothing bad happens.
+			rax_garbled = true; // Because ] overwrites rax, so it's probably overwritten and if it's not, nothing bad happens.
 			break;
 		case '.':
-			raxoverwritten = true;
+			rax_garbled = true;
 			vpusharr(ret, {
 				{ TEST, arg2, arg2 }, // If there's no putchar function passed in, just skip.
 				{ JZ, rel(6) },
@@ -93,7 +91,7 @@ x64Ins* bf_compile(char* in) {
 			});
 			break;
 		case ']':
-			raxoverwritten = true;
+			rax_garbled = true;
 			vpusharr(ret, {
 				{ MOV, rax, mem($rbp, -8) },
 				{ CMP, m8($rax), imm(0) },
@@ -125,7 +123,7 @@ TEST("Print a letter: Compile") {
 	x64Ins* ins = bf_compile("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.");
 	uint32_t len;
 	void* compiled = x64as(ins, vlen(ins), &len);
-	hi = (void*) x64_exec(compiled, len);
+	hi = (void*) x64exec(compiled, len);
 }
 
 TEST("Print a letter: Run") {
@@ -139,7 +137,7 @@ TEST("Print hello world: Compile") {
 	x64Ins* ins = bf_compile(prog1);
 	uint32_t len = 0;
 	void* compiled = x64as(ins, vlen(ins), &len);
-	hi = (void*) x64_exec(compiled, len);
+	hi = (void*) x64exec(compiled, len);
 }
 
 TEST("Print hello world: Run") {
