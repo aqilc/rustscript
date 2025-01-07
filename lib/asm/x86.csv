@@ -1071,10 +1071,10 @@ REX.W+ C7 /0 id	MOV r/m64, imm32	MI	W, R						V	NE		movq	YES	Move imm32 sign ext
 														
 0F 20 /r	MOV r32, CR0-CR7						NO	YES	NE	V				Move control register to r32.
 0F 20 /r	MOV r64, CR0-CR7						NO	YES	V	NE				Move extended control register to r64.
-REX.R+ 0F 20	MOV r64, CR8						NO	YES	V	NE				Move extended CR8 to r64.1
+REX.R+ 0F 20	MOV r64, CR8						NO	YES	V	NE				Move extended CR8 to r64.
 0F 22 /r	MOV CR0-CR7, r32						NO	YES	NE	V				Move r32 to control register.
 0F 22 /r	MOV CR0-CR7, r64						NO	YES	V	NE				Move r64 to extended control register.
-REX.R+ 0F 22	MOV CR8, r64						NO	YES	V	NE				Move r64 to extended CR8.1
+REX.R+ 0F 22	MOV CR8, r64						NO	YES	V	NE				Move r64 to extended CR8.
 														
 0F 21 /r	MOV r32, DR0-DR7						NO	YES	NE	V				Move debug register to r32.
 0F 21 /r	MOV r64, DR0-DR7						NO	YES	V	NE				Move extended debug register to r64.

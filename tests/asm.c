@@ -165,6 +165,28 @@ TEST("Assemble AVX (VEX) Instructions (With the VEX Prefix)") {
 	INSTESTMEMEQ(0xC4, 0xE3, 0x75, 0x4B, 0x54, 0x10, 0x0A, 0x50);
 }
 
+TEST("Assemble instructions with extremely specific operands.") {
+	uint8_t buf[10] = {0};
+
+	INSTEST(0xD0 0xD0, RCL, al, imm(1));
+	INSTESTMEMEQ(0xD0, 0xD0);
+
+	INSTEST(0xD2 0xD0, RCL, al, cl);
+	INSTESTMEMEQ(0xD2, 0xD0);
+
+	INSTEST(0xD1 0x08, ROR, m32($rax), imm(1));
+	INSTESTMEMEQ(0xD1, 0x08);
+
+	INSTEST(0x48 0x15 0x0A 0x00 0x00 0x00, ADC, rax, im32(10))
+	INSTESTMEMEQ(0x48, 0x15, 0x0A, 0x00, 0x00, 0x00);
+
+	INSTEST(0x66 0x0F 0xA1, POP, fs, { PREF66 });
+	INSTESTMEMEQ(0x66, 0x0F, 0xA1);
+
+	INSTEST(0x0F 0xA9, POP, gs);
+	INSTESTMEMEQ(0x0F, 0xA9)
+}
+
 TEST("Stringify instructions") {
 	SUB("Stringify MOV, rax, rax => mov rax, rax")
 		assertstreq(x64stringify((x64) { MOV, rax, rax }, 1), "mov rax, rax");
@@ -172,7 +194,7 @@ TEST("Stringify instructions") {
 	SUB("Stringify MOV, rax, imm(0xABCDEF) => mov rax, 0xABCDEF")
 		assertstreq(x64stringify((x64) { MOV, rax, imm(0xABCDEF) }, 1), "mov rax, 0xABCDEF");
 
-	SUB("Stringify MOV, rax, mem($rax, 0xABCDEF, $r8, 2, $es) => mov rax, es:[rax + r8 * 2 + 0xABCDEF]")
+	SUB("Stringify MOV, rax, mem($rax, 0xABCDEF, $r8, 2, $es) => mov rax, es:[rax + 0xABCDEF + r8 * 2]")
 		assertstreq(x64stringify((x64) { MOV, rax, mem($rax, 0xABCDEF, $r8, 2, $es) }, 1), "mov rax, es:[rax + 0xABCDEF + r8 * 2]");
 
 	SUB("Stringify LEA, rax, mem($riprel, 0xABCDEF) => lea rax, [$+11259375]")

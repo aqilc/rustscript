@@ -27,8 +27,8 @@ ifeq ($(OS),Windows_NT)
 
 	# CC := clang
 	# COMPILEFLAG := -c 
-	# CFLAGS := -O3 -g -I"../lib" -I"../deps/include"
-	# TCFLAGS := -O3 -g -I"../lib" -I"../deps/include"
+	# CFLAGS := -O3 -Wall -Wextra -I"../lib" -I"../deps/include"
+	# TCFLAGS := -O3 -I"../lib" -I"../deps/include"
 	# EXENAME := -o
 	# OBJEND := .o 
 	# OUTPUTFILENAME := -o 

@@ -133,7 +133,7 @@ static inline x64LookupActualIns* identify(const x64Ins* ins) {
     else if(ins->params[immplace - 1].value > 0x10000) insoperands[immplace - 1] = IMM32 | IMM8 | IMM16;
   }
   // Adds more specificity to the ambiguous rel() macro's REL32 | REL8
-  else if(ins->op >= JA && ins->op <= JMP && insoperands[0] & REL8) {
+  else if(insoperands[0] & REL8) {
     // 8 * 15 = 120, which is the maximum value for a REL8. This is suboptimal but fast enough and simple for now.
     if((i32) ins->params[0].value > 8 || (i32) ins->params[0].value < -8) insoperands[0] = REL32;
     else insoperands[0] = REL8;
@@ -146,16 +146,17 @@ next:
     if(unresins->ins[i].arglen != operandnum) continue;
     x64LookupActualIns* currentins = unresins->ins + i;
 
-    bool morespecific = false;
-    for(u32 j = 0; j < operandnum; j ++)
+    // bool morespecific = false;
+    for(u32 j = 0; j < operandnum; j ++) {
       if(!(currentins->args[j] & insoperands[j])) goto cont;
-      else if(resolved && (
-          resolved->args[j] < (currentins->args[j] & insoperands[j]) || // Generally, more specific arguments have a higher set bit than less specific ones.
-          (resolved->modrmreq && !currentins->modrmreq))) morespecific = true;
+      // else if(resolved && (
+          // resolved->args[j] < (currentins->args[j] & insoperands[j]) || // Generally, more specific arguments have a higher set bit than less specific ones.
+          // (resolved->modrmreq && !currentins->modrmreq))) morespecific = true;
+    }
     
     if(preferred && !currentins->preffered) continue;
     else if(currentins->preffered) preferred = true; // this order is necessary, since the first if validates there's no preference, and the last if only works if there's no preference
-    else if(resolved && !morespecific) continue;
+    else if(resolved) continue;
     resolved = currentins;
 cont:
     continue;
@@ -240,13 +241,17 @@ static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
       opcode_dest += 2;
     }
   }
-  // Segment Register for memory operands - Prefix group 2 (GCC Ordering)
-  if(res->mem_oper && ins->params[res->mem_oper].type & ((u64) 0x7 << 56))
-    *opcode_dest = ((u8[]) { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 })[((ins->params[res->mem_oper].type >> 56) & 0x7) - 1], opcode_dest ++;
   
-  // 67H prefix - Prefix group 4 (GCC Ordering)
-  if(res->mem_oper && (ins->params[res->mem_oper - 1].value & ((u64) 0x1 << 60)))
-    *opcode_dest = 0x67, opcode_dest ++;
+  if(res->mem_oper) {
+    
+    // Segment Register for memory operands - Prefix group 2 (GCC Ordering)
+    if(ins->params[res->mem_oper - 1].type & ((u64) 0x7 << 56))
+      *opcode_dest = ((u8[]) { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 })[((ins->params[res->mem_oper - 1].type >> 56) & 0x7) - 1], opcode_dest ++;
+  
+    // 67H prefix - Prefix group 4 (GCC Ordering)
+    if(ins->params[res->mem_oper - 1].value & ((u64) 0x1 << 60))
+      *opcode_dest = 0x67, opcode_dest ++;
+  }
 
   // Only for Normal **NON** VEX and EVEX instructions
   if(!res->vex) {
@@ -254,7 +259,7 @@ static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
     // 66H prefix - Prefix group 3 (GCC Ordering) + FWAIT and Prefix Group 1
     if(res->prefixes) {
       *(u32*) opcode_dest = res->prefixes;
-      opcode_dest += 1 + (res->prefixes >= 0x100) + (res->prefixes >= 0x10000);
+      opcode_dest += res->preflen;
     }
 
     // REX prefix
@@ -281,7 +286,7 @@ static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
   }
 
   // opcode
-  *(u32*)opcode_dest = res->opcode;
+  *(u32*) opcode_dest = res->opcode;
   opcode_dest += res->oplen;
 
   // ModR/M | MOD = XX, REG = XXX, RM = XXX | https://wiki.osdev.org/X86-64_Instruction_Encoding#:~:text=r/m-,32/64%2Dbit%20addressing,-These%20are%20the
@@ -476,8 +481,8 @@ char* x64stringify(const x64 p, u32 num) {
       else if(p[curins].params[i].type & (X64_ALLMEMMASK | allfarmask) && p[curins].params[i].value & ((u64)1 << 62))
         cursize += sprintf(code + cursize, "[$%+d]", (u32) p[curins].params[i].value);
 
-      else if(p[curins].params[i].type == X64_LABEL_REF)
-        cursize += sprintf(code + cursize, "%s", p[curins].label_name);
+      // else if(p[curins].params[i].type == X64_LABEL_REF)
+      //   cursize += sprintf(code + cursize, "%s", p[curins].label_name);
 
       else if(p[curins].params[i].type & (X64_ALLMEMMASK | allfarmask)) {
 
@@ -729,7 +734,7 @@ error:
   return NULL;
 }
 
-#if defined _WIN32 | defined __CYGWIN__
+#if defined _WIN32 || defined __CYGWIN__
 
 // https://learn.microsoft.com/en-us/windows/win32/memory/memory-protection-constants
 #define PAGE_EXECUTE_READ 0x20
@@ -759,6 +764,7 @@ void (*x64exec(void* mem, u32 size))() {
 
 void x64exec_free(void* buf, u32 size) {
   VirtualFree(buf, 0, MEM_RELEASE);
+  (void)size;
 }
 
 #else
