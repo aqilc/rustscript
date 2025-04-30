@@ -2665,6 +2665,8 @@ VEX.128.66.0F38.W0 0E /r	VTESTPS xmm1, xmm2/m128	RM	R, R		E.OF E.SF E.ZF E.AF E.
 VEX.256.66.0F38.W0 0E /r	VTESTPS ymm1, ymm2/m256	RM	R, R		E.OF E.SF E.ZF E.AF E.CF E.PF				V	V	AVX	vtestps		Set ZF and CF depending on sign bit AND and ANDN of packed single-precision floating- point sources.
 VEX.128.66.0F38.W0 0F /r	VTESTPD xmm1, xmm2/m128	RM	R, R		E.OF E.SF E.ZF E.AF E.CF E.PF				V	V	AVX	vtestpd		Set ZF and CF depending on sign bit AND and ANDN of packed double-precision floating- point sources.
 VEX.256.66.0F38.W0 0F /r	VTESTPD ymm1, ymm2/m256	RM	R, R		E.OF E.SF E.ZF E.AF E.CF E.PF				V	V	AVX	vtestpd		Set ZF and CF depending on sign bit AND and ANDN of packed double-precision floating- point sources.
+
+
 														
 VEX.256.0F.WIG 77	VZEROALL	NP			YMM*				V	V	AVX	vzeroall		Zero all YMM registers.
 														

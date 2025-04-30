@@ -9231,18 +9231,10 @@ static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest);
 _Thread_local struct AssemblyError {
   bool error;
   char buf[100];
-  enum AssemblyErrorType {
-    ASMERR_INVALID_INS,
-    ASMERR_INVALID_REG_TYPE,
-    ASMERR_INS_ARGUMENT_MISMATCH,
-    ASMERR_ESPRSP_USED_AS_INDEX,
-    ASMERR_REL_OUT_OF_RANGE,
-    ASMERR_LABEL_NOT_FOUND
-    // More to come
-  } error_type;
+  x64ErrorType error_type;
 } cur_error;
 
-static inline u32 error(enum AssemblyErrorType type, char* fmt, ...) {
+static inline u32 error(x64ErrorType type, char* fmt, ...) {
   cur_error.error = true;
   cur_error.error_type = type;
   va_list args;
@@ -9252,7 +9244,7 @@ static inline u32 error(enum AssemblyErrorType type, char* fmt, ...) {
   return 0;
 }
 
-char* x64error(int* errcode) {
+char* x64error(x64ErrorType* errcode) {
   if(cur_error.error) {
     cur_error.error = false;
     if(errcode) *errcode = cur_error.error_type;
@@ -9279,16 +9271,10 @@ static inline x64LookupActualIns* identify(const x64Ins* ins) {
 
   // Specifies bigger, more specific sizes for MOV based on the immediate value. Basically, picks the right instruction when there's an ambiguous immediate value.
   if(ins->op == MOV) {
-    u8 immplace = 0;
-    if(insoperands[1] & (IMM8 | IMM16 | IMM32 | IMM64)) immplace = 2;
-    else immplace = 1;
+    if((insoperands[0] & R64) == 0 || (insoperands[1] & (IMM32 | IMM64)) == 0) goto next;
     
-    // If there's no ambiguity in the immediate value, and it does not go into the RAX-R15 registers, there's no point
-    if ((insoperands[immplace - 1] & IMM64) == 0 || (insoperands[immplace - 1] & IMM32) == 0 ||
-        (insoperands[2 - immplace] & R64) == 0) goto next;
-    
-    if(ins->params[immplace - 1].value > 0x100000000) insoperands[immplace - 1] = IMM64;
-    else if(ins->params[immplace - 1].value > 0x10000) insoperands[immplace - 1] = IMM32 | IMM8 | IMM16;
+    if(ins->params[1].value >= 0x100000000) insoperands[1] = IMM64;
+    else if(ins->params[1].value >= 0x10000) insoperands[1] = IMM32 | IMM8 | IMM16;
   }
   // Adds more specificity to the ambiguous rel() macro's REL32 | REL8
   else if(insoperands[0] & REL8) {
@@ -9296,8 +9282,8 @@ static inline x64LookupActualIns* identify(const x64Ins* ins) {
     if((i32) ins->params[0].value > 8 || (i32) ins->params[0].value < -8) insoperands[0] = REL32;
     else insoperands[0] = REL8;
   }
-next:
   
+next:
   // ---------------------- Instruction resolution and Validation ---------------------- //
 
   for(u32 i = 0; i < unresins->numactualins; i ++) {
@@ -9350,7 +9336,7 @@ cont:
 // }
 
 // Instructions to keep note of: MOVS mem, mem on line 1203, page 844 in the manual.
-static u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
+static inline u32 encode(const x64Ins* ins, x64LookupActualIns* res, u8* opcode_dest) {
   if(!res) return 0;
 
   // ------------------------------ Special Instructions ------------------------------ //
@@ -9539,7 +9525,7 @@ end:
   }
 
   else if(res->is4_oper)
-    *opcode_dest = (u8) ins->params[res->is4_oper - 1].value << 4, opcode_dest ++;
+    *opcode_dest = (u8) ins->params[3].value << 4, opcode_dest ++;
 
   return opcode_dest - opcode_dest_start;
 }
@@ -9712,10 +9698,8 @@ char* x64stringify(const x64 p, u32 num) {
 }
 
 
-struct x64_relative {
-  u32 ins; bool relref; // regular relative or riprel
-  u8 size; u8 param;
-  x64LookupActualIns* res;
+struct x64Patch {
+  u32 ins; bool bit32; u8 param; i8 offs;
 };
 
 // static inline u32 fnv1a(const char* data) {
@@ -9762,30 +9746,35 @@ So I just want to release this tbh, I will hold off on label based linking and s
 */
 
 u8* x64as(const x64 p, u32 num, u32* len) {
+  if(!p || !num || !len) return NULL;
+
   u32 code_size = num * 15;// 15 is the maximum size of 1 instruction. Example: lwpval rax, cs:[rax+rbx*8+0x23829382], 100000000
-  u32 indexes_size = num * sizeof(u16);
-  u32 relref_size = num * sizeof(struct x64_relative);
+  u32 indexes_size = (num + 1) * sizeof(u32); // +1 because of the last index, which is just going to be curlen for ease of access
+  u32 relref_size = num * sizeof(struct x64Patch);
 
   u8 *const encoding_arena = calloc(code_size + indexes_size + relref_size, 1);
   u8 *const code = encoding_arena;
-  u16 *const indexes = (u16*) (encoding_arena + code_size);
-  struct x64_relative *const relrefidxes = (struct x64_relative*) (encoding_arena + code_size + indexes_size);
-  // 2048 * 15 + 2048 * 2 + 2048 * 16 = 67584, about 33x more memory than instructions :skull:
+  u32 *const indexes = (u32*) (encoding_arena + code_size);
+  struct x64Patch *const relrefidxes = (struct x64Patch*) (encoding_arena + code_size + indexes_size);
+  // 2048 * 15 + 2049 * 4 + 2048 * 8 = 51202, about 27x more memory than instructions :skull:
 
   *len = 0;
   u32 codelen = 0;
-  u32 index = 0;
   u32 relreflen = 0;
   
-  while (num --) {
+  for (i32 index = 0; index < num; index ++) {
     x64LookupActualIns* res = identify(p + index);
     int curlen = encode(p + index, res, code + codelen);
     if(!curlen) goto error;
 
+    i8 disp_offs = -4;
+    u8 disp_param;
+    bool bit32 = true;
+
     if(res->rel_oper) {
       i32 insns = p[index].params[res->rel_oper - 1].value;
 
-      // we don't need relrefs if the value was negative
+      // We don't need relrefs if the value was negative
       if(insns <= 1) {
         if(insns + index < 0) {
           error(ASMERR_REL_OUT_OF_RANGE, "Relative reference out of range on ins '%s'", x64stringify(p + index, 1));
@@ -9796,19 +9785,21 @@ u8* x64as(const x64 p, u32 num, u32* len) {
 
         if(insns == 1) offset = 0;
         else if (insns == 0) offset = -curlen;
-        else offset = indexes[index + insns] - curlen;
+        else offset = indexes[index + insns] - codelen - curlen;
 
         // JCC size is either 2, 3, 5 or 6 with 0f prefixes
         if(curlen > 4) { // DOWNSIZE IF INSTRUCTION IS TOO BIG
           if(offset >= -125) {
             curlen -= 3;
+
+            // If the offset is zero, then it's just jumping to the next instruction, so the size change doesn't matter since it's relative.
             if(offset != 0) offset -= 3;
             goto downsize;
           }
 upsize:
-          *(int*) (code + codelen + curlen - 4) = offset;
+          *(i32*) (code + codelen + curlen - 4) = offset;
         }
-        else if (curlen < 4) {
+        else {
           if(offset <= -128) { // UPSIZE IF INSTRUCTION IS TOO SMALL
             curlen += 3;
             if(offset != 0) offset += 3;
@@ -9817,18 +9808,19 @@ upsize:
 downsize:
           code[codelen + curlen - 1] = (i8) offset;
         }
-      } else {
-        relrefidxes[relreflen].ins = index;
-        relrefidxes[relreflen].res = res;
-        relrefidxes[relreflen].param = res->rel_oper - 1;
-        relrefidxes[relreflen].size = res->args[res->rel_oper - 1] == REL32 ? 4 : 1;
-        relreflen ++;
+
+        goto next;
       }
+      
+      disp_param = res->rel_oper - 1;
+      bit32 = res->args[res->rel_oper - 1] == REL32;
+      disp_offs = bit32 ? -4 : -1;
     }
 
     // Identify riprels
     else if(res->mem_oper && p[index].params[res->mem_oper - 1].value & 0x4000000000000000) {
       i32 insns = p[index].params[res->mem_oper - 1].value;
+      if(res->imm_oper || res->is4_oper) disp_offs -= (res->args[res->imm_oper - 1] >> 1) - !!res->is4_oper;
 
       // If resolving offsets for instructions that were already resolved, including the current instruction, take this fast path before adding work to the other for loop
       if(insns <= 1) {
@@ -9842,50 +9834,51 @@ downsize:
         if(insns == 1) offset = 0;
         else if (insns == 0) offset = -curlen;
         else offset = indexes[index + insns] - codelen - curlen; // i don't like repeating code but this is just simpler.
-        
-        // Currently no better way other than to directly reencode.
-        x64Ins ins = p[index];
-        ins.params[res->mem_oper - 1].value &= ~((u64) 0xffffffff);
-        ins.params[res->mem_oper - 1].value |= ((u64) offset) & 0xffffffff;
-        encode(&ins, res, code + codelen); // THIS WILL ALWAYS BE THE SAME SIZE SO NO NEED TO MANIPULATE CURLEN, RIP SIB HAS A CONSTANT SIZE.
-      } else {
-        relrefidxes[relreflen].ins = index;
-        relrefidxes[relreflen].res = res;
-        relrefidxes[relreflen].param = res->mem_oper - 1;
-        relrefidxes[relreflen].relref = true;
-        relreflen ++;
-      }
-    }
 
+        *(i32*) (code + codelen + curlen + disp_offs) = (i32) offset;
+        goto next;
+      }
+      
+      disp_param = res->mem_oper - 1;
+    }
+    else goto next;
+    
+    relrefidxes[relreflen].ins = index;
+    relrefidxes[relreflen].param = disp_param;
+    relrefidxes[relreflen].bit32 = bit32;
+    relrefidxes[relreflen].offs = disp_offs;
+    relreflen ++;
+
+next:
     indexes[index] = codelen;
     codelen += curlen;
-
-    index ++;
   }
 
-  for(u32 i = 0; i < relreflen; i ++) {
+  indexes[num] = codelen;
 
-    // Index of current instruction in `indexes`
-    u32 relidx = relrefidxes[i].ins;
-    const i64* insoffset = &p[relidx].params[relrefidxes[i].param].value;
-    i32 offset = indexes[relidx + /* The current instruction that is being resolved */ *(i32*) insoffset /* The offset of the relative */]
+  for(u32 i = 0; i < relreflen; i ++) {
+    u32 relidx = relrefidxes[i].ins; // Index of current instruction in `indexes`
+    const i32 insoffset = (i32) p[relidx].params[relrefidxes[i].param].value;
+
+    if(insoffset + relidx < 0 || insoffset + relidx > num) {
+      error(ASMERR_REL_OUT_OF_RANGE, "Relative reference out of range on ins '%s'", x64stringify(p + relidx, 1));
+      goto error;
+    }
+    
+    i32 offset = indexes[relidx + /* The current instruction that is being resolved */ insoffset /* The offset of the relative */]
                  - indexes[relidx + 1]; /* Added 1 because the offset is added to a rip pointing to the next instruction */
     
-    if(relrefidxes[i].relref) {
-      // Currently no better way other than to directly reencode.
-      x64Ins ins = p[relidx];
-      ins.params[relrefidxes[i].param].value &= ~((u64) 0xffffffff);
-      ins.params[relrefidxes[i].param].value |= ((u64) offset) & 0xffffffff;
-      encode(&ins, relrefidxes[i].res, code + indexes[relidx]);
-    } else {
-      if(relrefidxes[i].size == 4) {
-        *(int*) (code + indexes[relidx + 1] - 4) = offset;
-      } else code[indexes[relidx + 1] - 1] = (i8) offset;
-    }
+    // printf("Patching %s, with disp %d, bit32 %d, and offs %d, actual offs %d", x64stringify(p + relrefidxes[i].ins, 1), relrefidxes[i].offs, relrefidxes[i].bit32, *(i32*) insoffset, offset);
+    
+    if(relrefidxes[i].bit32)
+      *(i32*) (code + indexes[relidx + 1] + relrefidxes[i].offs) = offset;
+    
+    else code[indexes[relidx + 1] + relrefidxes[i].offs] = (i8) offset;
   }
 
   *len = codelen;
-  return encoding_arena;
+  return realloc(encoding_arena, codelen) ?: encoding_arena; // Handle realloc failure
+  
 error:
   free(encoding_arena);
   *len = 0;
