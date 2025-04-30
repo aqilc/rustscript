@@ -181,8 +181,9 @@ static inline size_t msizeof(const void *p) {
 
 
 char* tests_print_mem(void* mem, int size) {
+	testtempbuf[0] = 0;
 	int place = 0;
-	while(size --) place += snprintf(testtempbuf + place, 1000, "0x%02X ", *(unsigned char*) mem++);
+	while(size --) place += snprintf(testtempbuf + place, 5000, "0x%02X ", *(unsigned char*) mem++);
 	testtempbuf[place - 1] = 0;
 	return testtempbuf;
 }
