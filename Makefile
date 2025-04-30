@@ -26,12 +26,14 @@ ifeq ($(OS),Windows_NT)
 	DLLENDING := .dll
 	DLLFLAGS  := -Wl,--subsystem,windows
 	EXEENDING := .exe
+	PDBCLEAN := del *.pdb
 	STUPIDUNIXSHIT :=
 	CLEAN := rmdir /s /q
 else
 	DLLENDING := .a
 	DLLFLAGS  := 
 	EXEENDING := .bin
+	PDBCLEAN := 
 	STUPIDUNIXSHIT := ./
 	CLEAN := rm -rf
 	ifeq (,$(shell command -v mold 2> /dev/null))
@@ -84,6 +86,8 @@ $(BUILDDIR)/%.o: lib/asm/%.c
 clean:
 	$(CLEAN) $(BUILDDIR)
 	del main$(EXEENDING)
+	$(PDBCLEAN)
+	$(MAKE) -C tests clean
 	del *.dll
 
 .PHONY: all clean
