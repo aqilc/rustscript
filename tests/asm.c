@@ -7,8 +7,9 @@
 #undef OUT
 #include <asm/asm_x64.h>
 
-int instructionlen;
+uint32_t instructionlen;
 int expectedinslen;
+uint8_t buf[100] = {0};
 x64Ins curins;
 
 #define INSTEST(bytes, ...) \
@@ -21,8 +22,6 @@ x64Ins curins;
 #define INSTESTMEMEQ(...) expectbyteseq(buf, { __VA_ARGS__ }); } SUBBENCH() { x64emit(&curins, buf); }
 
 TEST("Assemble push instructions (1 argument, with optional REX and Addressing Overrides)") {
-	uint8_t buf[3] = {0};
-
 	benchiters(12345);
 
 	INSTEST(0x50, PUSH, rax);
@@ -39,8 +38,6 @@ TEST("Assemble push instructions (1 argument, with optional REX and Addressing O
 }
 
 TEST("Assemble call/jmp instructions (1 argument, with optional REX and Immediates)") {
-	uint8_t buf[7] = {0};
-
 	INSTEST(0xFF 0xD0, CALL, rax);
 	INSTESTMEMEQ(0xFF, 0xD0);
 
@@ -49,8 +46,6 @@ TEST("Assemble call/jmp instructions (1 argument, with optional REX and Immediat
 }
 
 TEST("Assemble mov instructions (2 arguments, with optional REX and Immediates)") {
-	uint8_t buf[10] = {0};
-	
 	INSTEST(0xB0 0x03, MOV, al, imm(3));
 	INSTESTMEMEQ(0xB0, 0x03);
 
@@ -77,8 +72,6 @@ TEST("Assemble mov instructions (2 arguments, with optional REX and Immediates)"
 }
 
 TEST("Assemble lea instructions (2 arguments, with optional REX and Immediates)") {
-	uint8_t buf[10] = {0};
-
 	INSTEST(0x49 0x8D 0x49 0x08, LEA, rcx, mem($r9, 8));
 	INSTESTMEMEQ(0x49, 0x8D, 0x49, 0x08);
 
@@ -90,8 +83,6 @@ TEST("Assemble lea instructions (2 arguments, with optional REX and Immediates)"
 }
 
 TEST("Assemble Special Instructions (1-2 arguments with different, FPU operand types)") {
-	uint8_t buf[10] = {0};
-
 	INSTEST(0xD9 0xC0, FLD, st0);
 	INSTESTMEMEQ(0xD9, 0xC0);
 
@@ -127,8 +118,6 @@ TEST("Assemble Special Instructions (1-2 arguments with different, FPU operand t
 }
 
 TEST("Assemble random SSE Instructions (2-3 arguments with many different prefixes)") {
-	uint8_t buf[10] = {0};
-	
 	INSTEST(0x67 0xF3 0x0F 0x7E 0x40 0x08, MOVQ, xmm0, mem($eax, 8));
 	INSTESTMEMEQ(0x67, 0xF3, 0x0F, 0x7E, 0x40, 0x08);
 
@@ -143,8 +132,6 @@ TEST("Assemble random SSE Instructions (2-3 arguments with many different prefix
 }
 
 TEST("Assemble AVX (VEX) Instructions (With the VEX Prefix)") {
-	uint8_t buf[13] = {0};
-
 	INSTEST(0xC5 0xF8 0x28 0xC6, VMOVAPS, xmm0, xmm6);
 	INSTESTMEMEQ(0xC5, 0xF8, 0x28, 0xC6);
 
@@ -166,8 +153,6 @@ TEST("Assemble AVX (VEX) Instructions (With the VEX Prefix)") {
 }
 
 TEST("Assemble instructions with extremely specific operands.") {
-	uint8_t buf[10] = {0};
-
 	INSTEST(0xD0 0xD0, RCL, al, imm(1));
 	INSTESTMEMEQ(0xD0, 0xD0);
 
@@ -206,5 +191,77 @@ TEST("Stringify instructions") {
 	SUB("Stringify VGATHERQPD, ymm3, mem($rax, 10, $ymm5, 8), ymm2 => vgatherqpd ymm3, [rax + 0xA + ymm5 * 8], ymm2")
 		assertstreq(x64stringify((x64) { VGATHERQPD, ymm3, mem($rax, 10, $ymm5, 8), ymm2 }, 1), "vgatherqpd ymm3, [rax + 0xA + ymm5 * 8], ymm2");
 }
+
+uint8_t expected[100] = {0};
+uint8_t* out = NULL;
+#define SLTESTRES(...)\
+	expectedinslen = (sizeof(#__VA_ARGS__) + 1) / 5;\
+	memcpy(expected, (uint8_t[]) { __VA_ARGS__ }, expectedinslen);
+
+#define SLTEST(name, str, ...)\
+	expectedinslen = sizeof(str) - 1;\
+	memcpy(expected, str, expectedinslen);\
+	SUB(name) {\
+		out = x64as((x64) __VA_ARGS__, sizeof((x64) __VA_ARGS__) / sizeof(x64Ins), &instructionlen);\
+		expecteq(instructionlen, expectedinslen);\
+		expect(memcmp(out, expected, instructionlen) == 0);\
+		/*printf("\n\nmem: %s\n", tests_print_mem(out, instructionlen));*/\
+	}
+
+TEST("Soft Linking Tests") {
+	SLTEST("Jump to after a MOV rax, 10", "\xEB\x07\x48\xC7\xC0\x0A\x00\x00\x00", {
+		{ JMP, rel(2) },
+		{ MOV, rax, imm(10) }
+	});
+
+	SLTEST("Jump to itself", "\xEB\xFE", {{ JMP, rel(0) }});
+
+	SLTEST("Jump Backwards before a MOV rax, 10", "\x48\xC7\xC0\x0A\x00\x00\x00\xEB\xF7", {
+		{ MOV, rax, imm(10) },
+		{ JMP, rel(-1) },
+	});
+
+	SLTEST("Relref to after a MOV rax, 10", "\x48\x8D\x05\x07\x00\x00\x00\x48\xC7\xC0\x0A\x00\x00\x00", {
+		{ LEA, rax, mem($riprel, 2) },
+		{ MOV, rax, imm(10) }
+	});
+
+	SLTEST("Relref to itself", "\x48\x8D\x05\xF9\xFF\xFF\xFF", {{ LEA, rax, mem($riprel, 0) }});
+
+	SLTEST("Relref to itself with a MOV rax, 10", "\x48\xC7\xC0\x0A\x00\x00\x00\x48\x8D\x05\xF2\xFF\xFF\xFF", {
+		{ MOV, rax, imm(10) },
+		{ LEA, rax, mem($riprel, -1) },
+	});
+
+	SLTEST("Error on out of bounds for relative jump backwards", "", {
+		{ MOV, rax, imm(10) },
+		{ JMP, rel(-3) }
+	});
+	
+	SLTEST("Error on out of bounds for relative jump forwards", "", {{ JMP, rel(3) }});
+
+	SLTEST("Error on out of bounds for Relref backwards", "", {
+		{ MOV, rax, imm(10) },
+		{ LEA, rax, mem($riprel, -3) }
+	});
+	
+	SLTEST("Error on out of bounds for Relref forwards", "", {{ LEA, rax, mem($riprel, 3) }});
+}
+
+TEST("x64as vs x64emit in a loop") {
+	const x64Ins copy = { MOV, rax, rcx };
+	#define TIMES 10000
+	x64Ins *const ins = malloc(sizeof(x64Ins) * TIMES);
+	assert(ins != NULL);
+	for (int i = 0; i < TIMES; i ++) ins[i] = copy;
+
+	benchiters(100);
+	BENCH("x64emit({ mov rax, rcx }) in a loop 10000 times") for(int i = 0; i < TIMES; i ++) x64emit(&copy, buf);
+
+	uint32_t len;
+  BENCH("x64as({ { mov rax, rcx }, ... 10000 times })") x64as(ins, TIMES, &len);
+	SUB("Done") assert(true);
+}
+
 
 #include "tests_end.h"
