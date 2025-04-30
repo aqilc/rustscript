@@ -32,7 +32,7 @@ char* prog1 = PROG(
 ----- - .               print 'l'
 ----- --- .             print 'd'
 > + .                   print '!'
-> .                     print '\n'
+// > .                     print '\n'
 );
 
 x64Ins* bf_compile(char* in) {
@@ -48,6 +48,7 @@ x64Ins* bf_compile(char* in) {
 		{ PUSH, rbp },
 		{ MOV, rbp, rsp },
 		{ MOV, rax, arg1 },
+		{ MOV, r13, arg2 },
 		{ PUSH, arg1 } // RCX = argument 1. 
 	});
 
@@ -72,10 +73,12 @@ x64Ins* bf_compile(char* in) {
 		}
 		case '[':
 			vpusharr(ret, {
-				{ LEA, rsi, m64($riprel, 0) }, // 0 here means $+0 or the current instruction
-				{ PUSH, rsi }
+				{ LEA, rbx, m64($riprel) }, // 0 here means $+0 or the current instruction
+				{ PUSH, rbx }
 			});
 			rax_garbled = true; // Because ] overwrites rax, so it's probably overwritten and if it's not, nothing bad happens.
+			// This is due to a fixed bug where the RAX got overwritten, then jumped back here, then the garbled value got used.
+			// Assuming it got overwritten at a jump site is the only way to prevent it, even though it will not be overwritten in the first iter.
 			break;
 		case '.':
 			rax_garbled = true;
@@ -85,7 +88,7 @@ x64Ins* bf_compile(char* in) {
 				{ MOV, rax, mem($rbp, -8) },
 				{ MOV, rcx, mem($rax) },
 				{ SUB, rsp, imm(64) }, // Should investigate aligining the stack to 16 bytes but this works for now(what msvc does).
-				{ MOV, rax, arg2 },
+				{ MOV, rax, r13 }, // Soooo RDX can get garbled, copied into r13 since it's callee saved in both System V and Windows
 				{ CALL, rax },
 				{ ADD, rsp, imm(64) },
 			});
@@ -113,7 +116,7 @@ x64Ins* bf_compile(char* in) {
 }
 
 
-char buf[200] = {};
+char buf[200] = {0};
 void custom_putchar(int c) {
 	buf[strlen(buf)] = c;
 }
@@ -121,28 +124,35 @@ void custom_putchar(int c) {
 void (*hi)(char* buf, void* printfn);
 TEST("Print a letter: Compile") {
 	x64Ins* ins = bf_compile("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.");
+	
 	uint32_t len;
 	void* compiled = x64as(ins, vlen(ins), &len);
+	
 	hi = (void*) x64exec(compiled, len);
 }
 
 TEST("Print a letter: Run") {
-	char buf[2] = {};
-	hi(buf);
+	char mem[100] = {};
+	hi(mem, custom_putchar);
 	expectstreq(buf, "s");
 }
 
 
 TEST("Print hello world: Compile") {
 	x64Ins* ins = bf_compile(prog1);
+	
 	uint32_t len = 0;
 	void* compiled = x64as(ins, vlen(ins), &len);
+	
 	hi = (void*) x64exec(compiled, len);
 }
 
 TEST("Print hello world: Run") {
-	char buf[20] = {0};
-	hi(buf);
+	char mem[100] = {};
+	
+	buf[0] = 0;
+	hi(mem, custom_putchar);
+	
 	expectstreq(buf, "Hello World!");
 }
 
