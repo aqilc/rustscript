@@ -132,8 +132,8 @@ TEST("Print a letter: Compile") {
 }
 
 TEST("Print a letter: Run") {
-	char mem[100] = {};
-	hi(mem, custom_putchar);
+	char buf2[100] = {};
+	hi(buf2, custom_putchar);
 	expectstreq(buf, "s");
 }
 
@@ -148,10 +148,10 @@ TEST("Print hello world: Compile") {
 }
 
 TEST("Print hello world: Run") {
-	char mem[100] = {};
+	char buf2[100] = {};
 	
 	buf[0] = 0;
-	hi(mem, custom_putchar);
+	hi(buf2, custom_putchar);
 	
 	expectstreq(buf, "Hello World!");
 }
