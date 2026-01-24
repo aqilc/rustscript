@@ -37,6 +37,10 @@ char* prog1 = PROG(
 
 x64Ins* bf_compile(char* in) {
 	x64Ins* ret = vnew();
+
+	// Keeps track of loops in a tree structure where we can rewind and pop to the parent node when needed.
+	struct { int start, end, parent_idx; }* loops = vnew();
+	int parentloop = -1;
 	
 #ifdef _WIN32
 	x64Operand arg1 = rcx, arg2 = rdx;
@@ -48,7 +52,7 @@ x64Ins* bf_compile(char* in) {
 		{ PUSH, rbp },
 		{ MOV, rbp, rsp },
 		{ MOV, rax, arg1 },
-		{ MOV, r13, arg2 },
+		{ MOV, r11, arg2 },
 		{ PUSH, arg1 } // RCX = argument 1. 
 	});
 
@@ -72,7 +76,13 @@ x64Ins* bf_compile(char* in) {
 			break;
 		}
 		case '[':
+			vpush(loops, { vlen(ret) + 2 /* 3 instructions down is JZ */, -1, parentloop });
+			parentloop = vlen(loops) - 1; // Keeps track of parent for the next node.
+			
 			vpusharr(ret, {
+				{ MOVZX, eax, m8($rax) },
+				{ TEST, al, al },
+				{ JZ }, // First argument (where to jump) to be filled in later!
 				{ LEA, rbx, m64($riprel) }, // 0 here means $+0 or the current instruction
 				{ PUSH, rbx }
 			});
@@ -84,22 +94,25 @@ x64Ins* bf_compile(char* in) {
 			rax_garbled = true;
 			vpusharr(ret, {
 				{ TEST, arg2, arg2 }, // If there's no putchar function passed in, just skip.
-				{ JZ, rel(6) },
+				{ JZ, rel(7) },
 				{ MOV, rax, mem($rbp, -8) },
-				{ MOV, rcx, mem($rax) },
+				{ MOV, arg1, mem($rax) },
 				{ SUB, rsp, imm(64) }, // Should investigate aligining the stack to 16 bytes but this works for now(what msvc does).
-				{ MOV, rax, r13 }, // Soooo RDX can get garbled, copied into r13 since it's callee saved in both System V and Windows
+				{ MOV, rax, r11 }, // Soooo RDX can get garbled, copied into r10 since it's caller saved in both System V and Windows
 				{ CALL, rax },
 				{ ADD, rsp, imm(64) },
 			});
 			break;
 		case ']':
+			loops[parentloop].end = vlen(ret) + 5;
+			if((parentloop = loops[parentloop].parent_idx) == -1) parentloop = 0;
+			
 			rax_garbled = true;
 			vpusharr(ret, {
 				{ MOV, rax, mem($rbp, -8) },
 				{ CMP, m8($rax), imm(0) },
-				{ JZ, rel(3) },
 				{ POP, rax },
+				{ JZ, rel(2) },
 				{ JMP, rax },
 			});
 		default: break;
@@ -112,6 +125,13 @@ x64Ins* bf_compile(char* in) {
 		{ POP, rbp },
 		{ RET },
 	});
+
+	for(int i = 0; i < vlen(loops); i ++) {
+		int end = loops[i].end, start = loops[i].start;
+		if (end == -1) end = vlen(ret) - 4; // compensating for the last 3 instructions.
+
+		ret[start].params[0] = rel(end - start); // Filling in that first argument that was needed before
+	}
 	return ret;
 }
 
@@ -122,32 +142,36 @@ void custom_putchar(int c) {
 }
 
 void (*hi)(char* buf, void* printfn);
-TEST("Print a letter: Compile") {
+TEST("Print a letter: Compile + Run") {
 	x64Ins* ins = bf_compile("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++.");
 	
 	uint32_t len;
 	void* compiled = x64as(ins, vlen(ins), &len);
 	
 	hi = (void*) x64exec(compiled, len);
-}
-
-TEST("Print a letter: Run") {
+	assert(hi != NULL);
+	
 	char buf2[100] = {};
 	hi(buf2, custom_putchar);
-	expectstreq(buf, "s");
+	assertstreq(buf, "s");
 }
 
 
-TEST("Print hello world: Compile") {
+TEST("Print hello world: Compile + Run") {
 	x64Ins* ins = bf_compile(prog1);
 	
 	uint32_t len = 0;
 	void* compiled = x64as(ins, vlen(ins), &len);
 	
+	expect(compiled != NULL);
+	if(compiled == NULL) printf("%s", x64error(NULL));
+	
 	hi = (void*) x64exec(compiled, len);
-}
 
-TEST("Print hello world: Run") {
+	assert(hi != NULL);
+	if(hi == NULL) printf("%s", x64error(NULL));
+
+	
 	char buf2[100] = {};
 	
 	buf[0] = 0;
