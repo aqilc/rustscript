@@ -12,6 +12,7 @@
 - Ease of typing and rapid prototyping
 - Compile to .exe, importing types and metadata from .exe.
 - As compatible with C as possible
+- There are no "statements", just expressions, even let.
 
 ### Preliminary Syntax
 
